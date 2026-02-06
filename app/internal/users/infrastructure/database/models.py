@@ -1,6 +1,6 @@
 from sqlalchemy import Column, String, Boolean, Integer, Text, TIMESTAMP, Enum, JSON
 from sqlalchemy.sql import func
-from app.internal.users.infrastructure.database.connection import Base
+from app.core.connection import Base
 import enum
 
 class GenderEnum(str, enum.Enum):

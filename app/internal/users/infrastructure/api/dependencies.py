@@ -1,8 +1,8 @@
 from typing import Generator, Optional
 from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials, OAuth2PasswordBearer
 from sqlalchemy.orm import Session
-from app.internal.users.infrastructure.database.connection import get_db
+from app.core.connection import get_db
 from app.internal.users.infrastructure.repositories.user_repository_impl import UserRepositoryImpl
 from app.internal.users.application.use_cases.create_user import CreateUserUseCase
 from app.internal.users.application.use_cases.login_user import LoginUserUseCase
@@ -11,7 +11,7 @@ from app.core.security import decode_token
 from app.core.exceptions import UnauthorizedException
 
 security = HTTPBearer()
-
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/v1/auth/login")
 # ==================== REPOSITORIES ====================
 
 def get_user_repository(db: Session = Depends(get_db)) -> UserRepositoryImpl:
@@ -49,22 +49,14 @@ def get_current_user_use_case(
 async def get_current_user_id(
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ) -> str:
-    """
-    Dependency para obtener el ID del usuario autenticado desde el token JWT
-    """
+    """Obtiene el ID del usuario desde un token Bearer JSON"""
     token = credentials.credentials
-    
     payload = decode_token(token)
     
     if payload is None:
         raise UnauthorizedException("Invalid or expired token")
     
-    user_id: Optional[str] = payload.get("sub")
-    
-    if user_id is None:
-        raise UnauthorizedException("Invalid token payload")
-    
-    return user_id
+    return payload.get("sub")
 
 async def get_current_user(
     user_id: str = Depends(get_current_user_id),

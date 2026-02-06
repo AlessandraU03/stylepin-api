@@ -50,3 +50,12 @@ class UserRepository(ABC):
         locked_until: Optional[datetime]
     ) -> None:
         pass
+    
+    @abstractmethod
+    async def get_by_identity(self, identity: str) -> Optional[User]:
+        """
+        Busca un usuario por su email o por su username.
+        Esencial para el login flexible.
+        """
+        pass
+    

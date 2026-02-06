@@ -34,8 +34,8 @@ class RegisterRequest(BaseModel):
         return v
 
 class LoginRequest(BaseModel):
-    """DTO para login"""
-    email: EmailStr = Field(..., example="user@stylepin.com")
+    """DTO para login adaptado a email o username"""
+    identity: str = Field(..., example="fashionista o user@stylepin.com")
     password: str = Field(..., example="SecurePass123!")
 
 class AuthResponse(BaseModel):

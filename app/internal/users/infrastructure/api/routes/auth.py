@@ -6,6 +6,7 @@ from app.internal.users.infrastructure.api.dependencies import (
     get_create_user_use_case,
     get_login_user_use_case
 )
+from fastapi.security import OAuth2PasswordRequestForm
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -98,21 +99,12 @@ async def register(
         }
     }
 )
+
 async def login(
-    request: LoginRequest,
+    request: LoginRequest,  # Usamos directamente tu clase JSON
     use_case: LoginUserUseCase = Depends(get_login_user_use_case)
 ):
     """
-    **Authenticate user**
-    
-    - **email**: User's email address
-    - **password**: User's password
-    
-    **Security features:**
-    - Account locks after 5 failed attempts (15 minutes)
-    - Checks if account is active
-    - Returns JWT token valid for 7 days
-    
-    Returns user profile and JWT token
+    Este endpoint ahora solo pedirá 'identity' y 'password' en un JSON.
     """
     return await use_case.execute(request)

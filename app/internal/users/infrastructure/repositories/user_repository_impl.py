@@ -116,6 +116,21 @@ class UserRepositoryImpl(UserRepository):
             db_user.updated_at = datetime.utcnow()
             self.db.commit()
     
+    async def get_by_identity(self, identity: str) -> Optional[User]:
+        """
+        Busca un usuario por su email o por su username.
+        Implementación requerida por la interfaz UserRepository.
+        """
+        db_user = self.db.query(UserModel).filter(
+            or_(
+                UserModel.email == identity.lower(),
+                UserModel.username == identity
+            ),
+            UserModel.is_active == True
+        ).first()
+        
+        return self._to_entity(db_user) if db_user else None
+
     def _to_entity(self, db_user: UserModel) -> User:
         """Convierte modelo de DB a entidad de dominio"""
         return User(

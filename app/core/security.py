@@ -4,7 +4,10 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 from app.core.config import settings
 from passlib.context import CryptContext
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
+security = HTTPBearer()
 # Usa bcrypt con configuración explícita
 pwd_context = CryptContext(
     schemes=["bcrypt"],
@@ -58,3 +61,30 @@ def decode_token(token: str) -> dict:
         return payload
     except JWTError:
         return None
+    
+async def get_current_user_id(
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+) -> str:
+    """
+    Dependencia simplificada para obtener el ID del usuario desde el JWT.
+    En Swagger aparecerá un cuadro para pegar solo el token.
+    """
+    # credentials.credentials extrae automáticamente el token del header Authorization
+    token = credentials.credentials
+    
+    payload = decode_token(token)
+    if payload is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    user_id: str = payload.get("sub")
+    if user_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token payload missing user ID",
+        )
+        
+    return user_id

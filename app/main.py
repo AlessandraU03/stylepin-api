@@ -15,9 +15,10 @@ from app.core.exceptions import (
     UserNotFoundException,
     UnauthorizedException
 )
-from app.internal.users.infrastructure.database.connection import engine, Base
+from app.core.connection import engine, Base
 from app.internal.users.infrastructure.api.routes import auth, users
-
+from app.internal.pines.infrastructure.api.pin_routes import router as pins_router
+from app.internal.pines.infrastructure.database.pin_model import PinModel 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -26,25 +27,13 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """
-    Maneja eventos de inicio y cierre de la aplicación
-    """
-    # Startup
-    logger.info("🚀 Starting StylePin API...")
-    logger.info(f"📚 Swagger UI: http://{settings.HOST}:{settings.PORT}/docs")
-    logger.info(f"📖 ReDoc: http://{settings.HOST}:{settings.PORT}/redoc")
-    
-    # Crear tablas si no existen (solo en desarrollo)
+    logging.info("🚀 Starting StylePin API...")
     if settings.DEBUG:
-        logger.info("🗄️  Creating database tables...")
+        logging.info("🗄️ Creating database tables...")
+        # Al haber importado los modelos arriba, Base ya sabe que existen 'users' y 'pins'
         Base.metadata.create_all(bind=engine)
-    
     yield
-    
-    # Shutdown
-    logger.info("👋 Shutting down StylePin API...")
-
-# ==================== APP INSTANCE ====================
+    logging.info("👋 Shutting down StylePin API...")
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -210,6 +199,7 @@ async def health_check():
 # Include routers
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(users.router, prefix="/api/v1")
+app.include_router(pins_router, prefix="/api/v1") 
 
 # Root endpoint
 @app.get(

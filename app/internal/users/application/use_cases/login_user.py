@@ -16,7 +16,7 @@ class LoginUserUseCase:
     
     async def execute(self, request: LoginRequest) -> dict:
         # 1. Buscar usuario por email
-        user = await self.user_repository.get_by_email(request.email.lower())
+        user = await self.user_repository.get_by_identity(request.identity)
         
         if not user:
             raise InvalidCredentialsException()
