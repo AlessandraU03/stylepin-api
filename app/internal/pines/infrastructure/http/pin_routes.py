@@ -142,6 +142,13 @@ async def create_pin(
     user_id: str = Depends(get_current_user_id),
     controller: PinController = Depends(get_pin_controller),
 ):
+    # LOGS DETALLADOS
+    logger.warning(f"POST /pins - image: {image.filename if image else None}")
+    logger.warning(f"title: {title}, category: {category}, season: {season}, price_range: {price_range}, is_private: {is_private}")
+    logger.warning(f"description: {description}, styles: {styles}, occasions: {occasions}, brands: {brands}, where_to_buy: {where_to_buy}, purchase_link: {purchase_link}, colors: {colors}, tags: {tags}")
+    logger.warning(f"user_id: {user_id}")
+
+    # ...existing code...
     """
     📱 **Endpoint principal para la app móvil.**
 

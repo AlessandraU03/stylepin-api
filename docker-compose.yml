@@ -6,7 +6,7 @@ services:
     expose:
       - "3000"
     environment:
-      - DB_HOST=172.31.16.124
+      - DB_HOST=98.95.177.156
       - DB_USER=ale
       - DB_PASSWORD=Lagartija20
       - DB_NAME=stylepin
