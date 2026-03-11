@@ -6,79 +6,114 @@ from contextlib import asynccontextmanager
 import time
 import logging
 
-from app.core.config import settings
-from app.core.exceptions import (
+from core.database.config import settings
+from core.exceptions import (
     UserAlreadyExistsException,
     InvalidCredentialsException,
     AccountLockedException,
     AccountDeactivatedException,
     UserNotFoundException,
-    UnauthorizedException
+    UnauthorizedException,
 )
-from app.core.connection import engine, Base
-from app.internal.users.infrastructure.api.routes import auth, users
-from app.internal.pines.infrastructure.api.pin_routes import router as pins_router
-from app.internal.pines.infrastructure.database.pin_model import PinModel 
+from core.connection import engine, Base
+
+# ── Importar modelos para que SQLAlchemy los registre ─────────
+from core.database.models import (
+    UserModel,
+    PinModel,
+    BoardModel,
+    BoardPinModel,
+    BoardCollaboratorModel,
+    LikeModel,
+    FollowModel,
+    CommentModel,
+)
+
+# ── Importar routers ──────────────────────────────────────────
+from internal.users.infrastructure.http.auth_routes import router as auth_router
+from internal.users.infrastructure.http.user_routes import router as users_router
+from internal.pines.infrastructure.http.pin_routes import router as pins_router
+from internal.boards.infrastructure.http.board_routes import router as boards_router
+from internal.likes.infrastructure.http.like_routes import router as likes_router
+from internal.follows.infrastructure.http.follow_routes import router as follows_router
+from internal.comments.infrastructure.http.comment_routes import router as comments_router
+
+# ── Upload de imágenes ────────────────────────────────────────
+from core.upload_routes import router as upload_router
+
+# ── WebSocket ─────────────────────────────────────────────────
+from core.websocket_routes import router as ws_router
+
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
 
 # ==================== LIFESPAN EVENTS ====================
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logging.info("🚀 Starting StylePin API...")
+    logger.info("🚀 Starting Amura API...")
     if settings.DEBUG:
-        logging.info("🗄️ Creating database tables...")
-        # Al haber importado los modelos arriba, Base ya sabe que existen 'users' y 'pins'
+        logger.info("🗄️ Creating database tables...")
         Base.metadata.create_all(bind=engine)
     yield
-    logging.info("👋 Shutting down StylePin API...")
+    logger.info("👋 Shutting down Amura API...")
+
+
+# ==================== APP ====================
 
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
     description="""
-    ## 📌 StylePin API - Tu Pinterest Personal de Moda
-    
+    ## 📌 Amura API - Tu Pinterest Personal de Moda
+
     API REST para gestionar perfiles de usuario, pins de moda y crear una comunidad fashion.
-    
+
     ### 🎯 Features Principales:
-    
+
     * **Autenticación segura** con JWT
     * **Gestión de usuarios** (registro, login, perfiles)
-    * **Pins de moda** (Corte 2)
-    * **Sistema social** (follows, likes, saves) (Corte 2)
-    * **Recomendaciones IA** (Corte 3)
-    
+    * **Pins de moda** (crear, editar, eliminar, feed, trending)
+    * **Boards** (tableros con colaboradores)
+    * **Sistema social** (follows, likes, comments)
+    * **Upload de imágenes** (Cloudinary)
+    * **WebSocket** (notificaciones en tiempo real)
+
     ### 🔐 Autenticación:
-    
+
     1. Registrarse en `/api/v1/auth/register`
     2. Hacer login en `/api/v1/auth/login`
     3. Copiar el token recibido
     4. Click en el botón **"Authorize"** (🔓) arriba a la derecha
-    5. Pegar token en el formato: `Bearer <tu-token>`
+    5. Pegar el token
     6. ¡Listo! Ya puedes acceder a endpoints protegidos
-    
+
+    ### 📸 Upload de imágenes:
+
+    1. `POST /api/v1/upload/pin-image` → sube imagen y obtiene URL
+    2. `POST /api/v1/pins` → crea pin usando la URL obtenida
+
+    ### 🔌 WebSocket:
+
+    ```
+    ws://localhost:3000/ws?token=<JWT_TOKEN>
+    ```
+
     ### 📚 Documentación:
-    
-    * **Swagger UI**: Interfaz interactiva para probar endpoints
-    * **ReDoc**: Documentación alternativa más limpia
-    
-    ### 👥 Desarrolladores:
-    
-    * Tu nombre
-    * Nombre de tu compañero
-    
+
+    * **Swagger UI**: `/docs`
+    * **ReDoc**: `/redoc`
+
     ---
-    
-    **Materia**: Programación para Móviles I  
-    **Institución**: Tu universidad  
+
+    **Materia**: Programación para Móviles I
     **Periodo**: Enero-Abril 2026
     """,
     contact={
-        "name": "StylePin Support",
-        "email": "support@stylepin.com",
+        "name": "Amura Support",
+        "email": "support@amura.com",
     },
     license_info={
         "name": "MIT",
@@ -87,8 +122,9 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
+
 
 # ==================== MIDDLEWARE ====================
 
@@ -101,6 +137,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 # Request timing middleware
 @app.middleware("http")
 async def add_process_time_header(request: Request, call_next):
@@ -110,69 +147,75 @@ async def add_process_time_header(request: Request, call_next):
     response.headers["X-Process-Time"] = str(process_time)
     return response
 
+
 # ==================== EXCEPTION HANDLERS ====================
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    """Maneja errores de validación de Pydantic"""
     errors = []
     for error in exc.errors():
         errors.append({
             "field": " -> ".join(str(loc) for loc in error["loc"]),
             "message": error["msg"],
-            "type": error["type"]
+            "type": error["type"],
         })
-    
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content={
             "error": "Validation Error",
             "message": "Invalid request data",
-            "details": errors
-        }
+            "details": errors,
+        },
     )
+
 
 @app.exception_handler(UserAlreadyExistsException)
 async def user_already_exists_handler(request: Request, exc: UserAlreadyExistsException):
     return JSONResponse(
         status_code=exc.status_code,
-        content={"error": "User Already Exists", "message": exc.detail}
+        content={"error": "User Already Exists", "message": exc.detail},
     )
+
 
 @app.exception_handler(InvalidCredentialsException)
 async def invalid_credentials_handler(request: Request, exc: InvalidCredentialsException):
     return JSONResponse(
         status_code=exc.status_code,
-        content={"error": "Invalid Credentials", "message": exc.detail}
+        content={"error": "Invalid Credentials", "message": exc.detail},
     )
+
 
 @app.exception_handler(AccountLockedException)
 async def account_locked_handler(request: Request, exc: AccountLockedException):
     return JSONResponse(
         status_code=exc.status_code,
-        content={"error": "Account Locked", "message": exc.detail}
+        content={"error": "Account Locked", "message": exc.detail},
     )
+
 
 @app.exception_handler(AccountDeactivatedException)
 async def account_deactivated_handler(request: Request, exc: AccountDeactivatedException):
     return JSONResponse(
         status_code=exc.status_code,
-        content={"error": "Account Deactivated", "message": exc.detail}
+        content={"error": "Account Deactivated", "message": exc.detail},
     )
+
 
 @app.exception_handler(UserNotFoundException)
 async def user_not_found_handler(request: Request, exc: UserNotFoundException):
     return JSONResponse(
         status_code=exc.status_code,
-        content={"error": "User Not Found", "message": exc.detail}
+        content={"error": "User Not Found", "message": exc.detail},
     )
+
 
 @app.exception_handler(UnauthorizedException)
 async def unauthorized_handler(request: Request, exc: UnauthorizedException):
     return JSONResponse(
         status_code=exc.status_code,
-        content={"error": "Unauthorized", "message": exc.detail}
+        content={"error": "Unauthorized", "message": exc.detail},
     )
+
 
 # ==================== ROUTES ====================
 
@@ -181,43 +224,42 @@ async def unauthorized_handler(request: Request, exc: UnauthorizedException):
     "/health",
     tags=["Health"],
     summary="Health check",
-    description="Check if API is running",
-    status_code=status.HTTP_200_OK
+    status_code=status.HTTP_200_OK,
 )
 async def health_check():
-    """
-    **Health check endpoint**
-    
-    Returns API status and version
-    """
     return {
         "status": "healthy",
         "app": settings.APP_NAME,
-        "version": settings.APP_VERSION
+        "version": settings.APP_VERSION,
     }
 
-# Include routers
-app.include_router(auth.router, prefix="/api/v1")
-app.include_router(users.router, prefix="/api/v1")
-app.include_router(pins_router, prefix="/api/v1") 
+
+# API routers
+app.include_router(auth_router, prefix="/api/v1")
+app.include_router(users_router, prefix="/api/v1")
+app.include_router(pins_router, prefix="/api/v1")
+app.include_router(boards_router, prefix="/api/v1")
+app.include_router(likes_router, prefix="/api/v1")
+app.include_router(follows_router, prefix="/api/v1")
+app.include_router(comments_router, prefix="/api/v1")
+app.include_router(upload_router, prefix="/api/v1")
+
+# WebSocket router (sin prefix — se conecta en ws://host/ws)
+app.include_router(ws_router)
+
 
 # Root endpoint
 @app.get(
     "/",
     tags=["Root"],
     summary="API Root",
-    description="Welcome message and API info"
 )
 async def root():
-    """
-    **API Root**
-    
-    Returns welcome message and links to documentation
-    """
     return {
-        "message": "Welcome to StylePin API! 📌",
+        "message": "Welcome to Amura API! 📌",
         "version": settings.APP_VERSION,
         "docs": "/docs",
         "redoc": "/redoc",
-        "health": "/health"
+        "health": "/health",
+        "websocket": "ws://localhost:3000/ws?token=<JWT_TOKEN>",
     }

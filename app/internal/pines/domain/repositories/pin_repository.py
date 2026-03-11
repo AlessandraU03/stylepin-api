@@ -1,10 +1,9 @@
 """
 Interface del repositorio de Pins (Port)
-Define el contrato que debe cumplir la implementación
 """
 from abc import ABC, abstractmethod
 from typing import Optional, List
-from app.internal.pines.domain.entities.pin import Pin
+from internal.pines.domain.entities.pin import Pin
 
 class PinRepository(ABC):
     """Repositorio de Pins - Interface"""
@@ -26,9 +25,10 @@ class PinRepository(ABC):
         offset: int = 0,
         user_id: Optional[str] = None,
         category: Optional[str] = None,
-        season: Optional[str] = None
+        season: Optional[str] = None,
+        price_range: Optional[str] = None
     ) -> List[Pin]:
-        """Obtener lista de pins con filtros opcionales"""
+        """Obtener lista de pins públicos con filtros opcionales"""
         pass
     
     @abstractmethod
@@ -36,7 +36,8 @@ class PinRepository(ABC):
         self, 
         user_id: str, 
         limit: int = 20, 
-        offset: int = 0
+        offset: int = 0,
+        include_private: bool = False
     ) -> List[Pin]:
         """Obtener pins de un usuario específico"""
         pass
@@ -57,6 +58,36 @@ class PinRepository(ABC):
         pass
     
     @abstractmethod
+    async def increment_likes(self, pin_id: str) -> None:
+        """Incrementar contador de likes"""
+        pass
+    
+    @abstractmethod
+    async def decrement_likes(self, pin_id: str) -> None:
+        """Decrementar contador de likes"""
+        pass
+    
+    @abstractmethod
+    async def increment_saves(self, pin_id: str) -> None:
+        """Incrementar contador de guardados"""
+        pass
+    
+    @abstractmethod
+    async def decrement_saves(self, pin_id: str) -> None:
+        """Decrementar contador de guardados"""
+        pass
+    
+    @abstractmethod
+    async def increment_comments(self, pin_id: str) -> None:
+        """Incrementar contador de comentarios"""
+        pass
+    
+    @abstractmethod
+    async def decrement_comments(self, pin_id: str) -> None:
+        """Decrementar contador de comentarios"""
+        pass
+    
+    @abstractmethod
     async def search(
         self,
         query: str,
@@ -64,4 +95,28 @@ class PinRepository(ABC):
         offset: int = 0
     ) -> List[Pin]:
         """Buscar pins por título, descripción o tags"""
+        pass
+    
+    @abstractmethod
+    async def get_feed(
+        self,
+        user_id: str,
+        limit: int = 20,
+        offset: int = 0
+    ) -> List[Pin]:
+        """
+        Obtener feed personalizado para un usuario
+        (pins de usuarios que sigue)
+        """
+        pass
+    
+    @abstractmethod
+    async def get_trending(
+        self,
+        limit: int = 20,
+        hours: int = 24
+    ) -> List[Pin]:
+        """
+        Obtener pins trending (más likes/views en últimas X horas)
+        """
         pass

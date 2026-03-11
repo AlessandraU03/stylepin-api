@@ -1,75 +1,52 @@
-from datetime import datetime, timedelta
-from app.internal.users.domain.repositories.user_repository import UserRepository
-from app.internal.users.application.schemas.auth_schema import LoginRequest
-from app.internal.users.domain.entities.user import UserProfile
-from app.core.security import verify_password, create_access_token
-from app.core.exceptions import (
-    InvalidCredentialsException,
-    AccountLockedException,
-    AccountDeactivatedException,
-    UserNotFoundException
-)
+"""
+Caso de uso: Login de usuario con seguridad
+"""
+from datetime import datetime, timezone, timedelta
+from internal.users.domain.entities.user import User
+from internal.users.domain.repositories.user_repository import UserRepository
+
+MAX_LOGIN_ATTEMPTS = 5
+LOCK_DURATION_MINUTES = 30
+
 
 class LoginUserUseCase:
     def __init__(self, user_repository: UserRepository):
-        self.user_repository = user_repository
-    
-    async def execute(self, request: LoginRequest) -> dict:
-        # 1. Buscar usuario por email
-        user = await self.user_repository.get_by_identity(request.identity)
-        
+        self._repo = user_repository
+
+    async def execute(self, identity: str) -> User:
+        """
+        Busca al usuario y verifica que no esté bloqueado.
+        La verificación del password se hace en el controller.
+        """
+        user = await self._repo.get_by_identity(identity.strip())
+
         if not user:
-            raise InvalidCredentialsException()
-        
-        # 2. Verificar que esté activo
+            raise ValueError("Credenciales inválidas")
+
         if not user.is_active:
-            raise AccountDeactivatedException()
-        
-        # 3. Verificar si está bloqueado
+            raise ValueError("La cuenta está desactivada")
+
+        # Verificar si está bloqueado
         if user.is_locked():
-            raise AccountLockedException()
-        
-        # 4. Verificar contraseña
-        if not verify_password(request.password, user.password_hash):
-            # Incrementar intentos fallidos
-            user.login_attempts += 1
-            
-            # Bloquear si llega a 5 intentos
-            locked_until = None
-            if user.login_attempts >= 5:
-                locked_until = datetime.utcnow() + timedelta(minutes=15)
-            
-            await self.user_repository.update_login_attempts(
-                user.id,
-                user.login_attempts,
-                locked_until
+            raise ValueError(
+                f"Cuenta bloqueada temporalmente. Intenta de nuevo después de {user.locked_until}"
             )
-            
-            raise InvalidCredentialsException()
-        
-        # 5. Login exitoso: resetear intentos
-        await self.user_repository.update_login_attempts(user.id, 0, None)
-        
-        # 6. Actualizar última fecha de login
-        await self.user_repository.update_last_login(user.id)
-        
-        # 7. Generar token JWT
-        token = create_access_token(
-            data={"sub": user.id, "role": user.role}
-        )
-        
-        # 8. Retornar respuesta (SOLO datos públicos)
-        return {
-            "user": UserProfile(
-                id=user.id,
-                username=user.username,
-                full_name=user.full_name,
-                bio=user.bio,
-                avatar_url=user.avatar_url,
-                preferred_styles=user.preferred_styles,
-                is_verified=user.is_verified,
-                created_at=user.created_at
-            ).model_dump(),
-            "token": token,
-            "token_type": "bearer"
-        }
+
+        return user
+
+    async def on_login_success(self, user_id: str) -> None:
+        """Llamar después de verificar password exitosamente"""
+        await self._repo.reset_login_attempts(user_id)
+        await self._repo.update_last_login(user_id)
+
+    async def on_login_failure(self, user_id: str, current_attempts: int) -> None:
+        """Llamar cuando el password es incorrecto"""
+        new_attempts = current_attempts + 1
+        await self._repo.increment_login_attempts(user_id)
+
+        # Bloquear cuenta si se exceden intentos
+        if new_attempts >= MAX_LOGIN_ATTEMPTS:
+            lock_until = datetime.now(timezone.utc) + timedelta(
+                minutes=LOCK_DURATION_MINUTES
+            )
+            await self._repo.lock_account(user_id, lock_until)

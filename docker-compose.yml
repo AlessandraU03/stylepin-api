@@ -1,32 +1,39 @@
 version: '3.8'
 
 services:
-  # Tu API (Backend)
   api:
     build: .
-    # Ya no exponemos puertos "80:3000" aquí porque Caddy lo manejará
-    # ports: 
-    #   - "3000:3000" <--- BORRA O COMENTA ESTO
     expose:
-      - "3000" # Solo visible para Caddy, no para internet directo
+      - "3000"
     environment:
-      - DB_HOST=172.31.16.124  # IP Privada de Instancia A
+      - DB_HOST=172.31.16.124
       - DB_USER=ale
       - DB_PASSWORD=Lagartija20
       - DB_NAME=stylepin
+      - HOST=0.0.0.0
       - PORT=3000
+      - DEBUG=false
+      - APP_NAME=Amura API
+      - APP_VERSION=1.0.0
+      - JWT_SECRET_KEY=tu-secret-key-segura-cambiar-en-produccion
+      - JWT_ALGORITHM=HS256
+      - JWT_ACCESS_TOKEN_EXPIRE_MINUTES=30
+      - CORS_ORIGINS=["*"]
+      - CLOUDINARY_CLOUD_NAME=tu-cloud-name
+      - CLOUDINARY_API_KEY=tu-api-key
+      - CLOUDINARY_API_SECRET=tu-api-secret
+
     restart: always
 
-  # El Servidor Web (HTTPS)
   caddy:
     image: caddy:latest
     restart: always
     ports:
-      - "80:80"   # Puerto HTTP (necesario para validar certificado)
-      - "443:443" # Puerto HTTPS (seguro)
+      - "80:80"
+      - "443:443"
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile  # Tu configuración
-      - caddy_data:/data                  # Para guardar los certificados y no pedirlos a cada rato
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
       - caddy_config:/config
     depends_on:
       - api

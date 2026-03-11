@@ -1,10 +1,15 @@
+"""
+Entidades de dominio para Users
+"""
 from datetime import datetime
 from typing import Optional, List
 from pydantic import BaseModel, EmailStr, field_validator
 import re
 
 class User(BaseModel):
-    """Entidad de dominio User - NUNCA exponer directamente en API"""
+    """
+    Entidad de dominio User - NUNCA exponer directamente en API
+    """
     id: str
     username: str
     email: EmailStr
@@ -35,6 +40,11 @@ class User(BaseModel):
             raise ValueError('Username can only contain letters, numbers, dots and underscores')
         return v
     
+    @field_validator('email')
+    @classmethod
+    def validate_email(cls, v: str) -> str:
+        return v.lower().strip()
+    
     def is_locked(self) -> bool:
         """Verifica si la cuenta está bloqueada"""
         if self.locked_until is None:
@@ -54,8 +64,6 @@ class UserProfile(BaseModel):
     preferred_styles: List[str] = []
     is_verified: bool
     created_at: datetime
-    
-    # Estadísticas (se agregarán en Corte 2)
     total_pins: int = 0
     total_followers: int = 0
     total_following: int = 0
