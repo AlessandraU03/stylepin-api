@@ -277,7 +277,7 @@ class MySQLUserRepository(UserRepository):
             from core.database.models import FollowModel
             stats["total_followers"] = (
                 self._db.query(func.count(FollowModel.id))
-                .filter(FollowModel.followed_id == user_id)
+                .filter(FollowModel.following_id == user_id)
                 .scalar() or 0
             )
             stats["total_following"] = (

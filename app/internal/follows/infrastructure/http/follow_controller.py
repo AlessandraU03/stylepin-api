@@ -68,7 +68,7 @@ class FollowController:
 
     # ── Notificación ──────────────────────────────────────────
 
-    async def _send_follow_notification(self, follower_id: str, followed_id: str):
+    async def _send_follow_notification(self, follower_id: str, following_id: str):
         """Obtiene username del follower y envía notificación"""
         if not self._db:
             return
@@ -79,11 +79,11 @@ class FollowController:
         follower_username = follower.username if follower else "alguien"
 
         await notify_new_follow(
-            followed_user_id=followed_id,
+            followed_user_id=following_id,
             follower_username=follower_username,
             follower_id=follower_id,
         )
-        logger.info(f"🔔 Follow: {follower_username} → {followed_id}")
+        logger.info(f"🔔 Follow: {follower_username} → {following_id}")
 
     # ── Listas ────────────────────────────────────────────────
 
