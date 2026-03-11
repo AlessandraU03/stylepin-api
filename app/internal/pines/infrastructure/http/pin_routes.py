@@ -203,7 +203,7 @@ async def create_pin(
     except Exception as e:
         # Si falla crear el pin, eliminar la imagen subida
         await image_service.delete_image(upload_result["public_id"])
-        logger.error(f"❌ Error creando pin, imagen eliminada: {e}")
+        logger.error(f"❌ Error creando pin, imagen eliminada: {e}", exc_info=True)  # <-- AGREGA ESTA LÍNEA
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
