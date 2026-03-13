@@ -305,3 +305,34 @@ class MySQLBoardRepository(BoardRepository):
             .all()
         )
         return [self._to_board_entity(m) for m in models]
+    
+    
+    async def get_all(
+        self, 
+        user_id: Optional[str] = None,
+        limit: int = 20, 
+        offset: int = 0
+    ) -> List[Board]:
+        """
+        Obtener todos los boards públicos
+        
+        Si se proporciona user_id, filtra por ese usuario.
+        Si no, devuelve todos los boards públicos del sistema.
+        """
+        query = self._db.query(BoardModel).filter(
+            BoardModel.is_private == False  # Solo boards públicos
+        )
+        
+        # Filtro opcional por usuario
+        if user_id:
+            query = query.filter(BoardModel.user_id == user_id)
+        
+        models = (
+            query
+            .order_by(BoardModel.updated_at.desc())  # Más recientes primero
+            .offset(offset)
+            .limit(limit)
+            .all()
+        )
+        
+        return [self._to_board_entity(m) for m in models]

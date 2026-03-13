@@ -2,12 +2,13 @@
 Rutas HTTP de Boards
 """
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from typing import Annotated
+from typing import Annotated, Optional, List
 
 from internal.boards.domain.entities.board import (
     BoardResponse,
     BoardPin,
     BoardCollaboratorResponse,
+    BoardSummary,
 )
 from internal.boards.application.schemas.board_schemas import (
     CreateBoardRequest,
@@ -28,7 +29,41 @@ from internal.users.infrastructure.middlewares.auth_middleware import get_curren
 router = APIRouter(prefix="/boards", tags=["Boards"])
 
 
-# ==================== BOARDS ====================
+# ==================== GET ALL BOARDS (PÚBLICOS) - DEBE IR PRIMERO ====================
+
+@router.get(
+    "",
+    response_model=List[BoardSummary],
+    status_code=status.HTTP_200_OK,
+    summary="Get all public boards",
+    description="Get list of public boards with optional filters"
+)
+async def get_all_boards(
+    user_id: Optional[str] = Query(None, description="Filter by user ID"),
+    limit: int = Query(20, ge=1, le=100, description="Number of results"),
+    offset: int = Query(0, ge=0, description="Offset for pagination"),
+    controller: BoardController = Depends(get_board_controller),
+):
+    """
+    **Get all public boards**
+    
+    Returns a list of public boards with summary information.
+    
+    Query Parameters:
+    - **user_id** (optional): Filter boards by specific user
+    - **limit**: Number of results (default: 20, max: 100)
+    - **offset**: Offset for pagination (default: 0)
+    
+    **No authentication required**
+    """
+    return await controller.get_all_boards(
+        user_id=user_id,
+        limit=limit,
+        offset=offset
+    )
+
+
+# ==================== BOARDS CRUD ====================
 
 @router.post(
     "",

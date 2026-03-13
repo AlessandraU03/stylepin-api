@@ -1,9 +1,13 @@
 """
 Controlador HTTP de Boards
 """
+from typing import List, Optional
+from fastapi import HTTPException, status
+
 from internal.boards.application.use_cases.create_board import CreateBoardUseCase
 from internal.boards.application.use_cases.get_board import GetBoardUseCase
 from internal.boards.application.use_cases.get_user_boards import GetUserBoardsUseCase
+from internal.boards.application.use_cases.get_all_boards import GetAllBoardsUseCase
 from internal.boards.application.use_cases.update_board import UpdateBoardUseCase
 from internal.boards.application.use_cases.delete_board import DeleteBoardUseCase
 from internal.boards.application.use_cases.add_pin_to_board import AddPinToBoardUseCase
@@ -13,7 +17,7 @@ from internal.boards.application.use_cases.add_collaborator import AddCollaborat
 from internal.boards.application.use_cases.remove_collaborator import RemoveCollaboratorUseCase
 from internal.boards.application.use_cases.update_collaborator import UpdateCollaboratorUseCase
 
-from internal.boards.domain.entities.board import Board, BoardResponse, BoardCollaboratorResponse
+from internal.boards.domain.entities.board import Board, BoardResponse, BoardCollaboratorResponse, BoardSummary
 from internal.boards.application.schemas.board_schemas import (
     CreateBoardRequest,
     UpdateBoardRequest,
@@ -33,6 +37,7 @@ class BoardController:
         create_uc: CreateBoardUseCase,
         get_uc: GetBoardUseCase,
         get_user_boards_uc: GetUserBoardsUseCase,
+        get_all_boards_uc: GetAllBoardsUseCase,  # NUEVO
         update_uc: UpdateBoardUseCase,
         delete_uc: DeleteBoardUseCase,
         add_pin_uc: AddPinToBoardUseCase,
@@ -45,6 +50,7 @@ class BoardController:
         self._create_uc = create_uc
         self._get_uc = get_uc
         self._get_user_boards_uc = get_user_boards_uc
+        self._get_all_boards_uc = get_all_boards_uc  # NUEVO
         self._update_uc = update_uc
         self._delete_uc = delete_uc
         self._add_pin_uc = add_pin_uc
@@ -94,6 +100,35 @@ class BoardController:
     async def get_board(self, board_id: str, user_id: str = None) -> BoardResponse:
         board = await self._get_uc.execute(board_id, requesting_user_id=user_id)
         return self._to_response(board, current_user_id=user_id)
+    
+    async def get_all_boards(
+        self,
+        user_id: Optional[str] = None,
+        limit: int = 20,
+        offset: int = 0
+    ) -> List[BoardSummary]:
+        """
+        Obtener todos los boards públicos
+        
+        Args:
+            user_id: (Opcional) Filtrar por usuario específico
+            limit: Número de resultados (default: 20)
+            offset: Offset para paginación (default: 0)
+            
+        Returns:
+            Lista de BoardSummary
+        """
+        try:
+            return await self._get_all_boards_uc.execute(
+                user_id=user_id,
+                limit=limit,
+                offset=offset
+            )
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Error fetching boards: {str(e)}"
+            )
 
     async def get_user_boards(
         self, user_id: str, current_user_id: str = None, limit: int = 20, offset: int = 0

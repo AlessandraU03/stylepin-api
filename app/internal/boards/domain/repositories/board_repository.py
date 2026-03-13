@@ -128,3 +128,23 @@ class BoardRepository(ABC):
     ) -> List[Board]:
         """Obtener tableros donde el usuario es colaborador"""
         pass
+
+    @abstractmethod
+    async def get_all(
+        self, 
+        limit: int = 20, 
+        offset: int = 0,
+        user_id: Optional[str] = None
+    ) -> List[Board]:
+        """
+        Obtener todos los boards públicos
+        
+        Args:
+            limit: Número de resultados
+            offset: Offset para paginación
+            user_id: (Opcional) Filtrar por usuario específico
+            
+        Returns:
+            Lista de boards públicos ordenados por más recientes
+        """
+        pass
