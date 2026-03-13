@@ -9,9 +9,9 @@ import json
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_, and_
 
-from internal.pines.domain.entities.pin import Pin
+from internal.pines.domain.entities.pin import Pin, PinResponse
 from internal.pines.domain.repositories.pin_repository import PinRepository
-from core.database.models import PinModel
+from core.database.models import PinModel, UserModel
 
 
 class MySQLPinRepository(PinRepository):
@@ -108,6 +108,8 @@ class MySQLPinRepository(PinRepository):
         ).first()
         return self._to_entity(model) if model else None
 
+
+
     async def get_all(
         self,
         limit: int = 20,
@@ -117,7 +119,11 @@ class MySQLPinRepository(PinRepository):
         season: Optional[str] = None,
         price_range: Optional[str] = None,
     ) -> List[Pin]:
-        query = self._db.query(PinModel).filter(PinModel.is_private == False)
+        query = (
+            self._db.query(PinModel, UserModel)
+            .join(UserModel, PinModel.user_id == UserModel.id)
+            .filter(PinModel.is_private == False)
+        )
 
         if user_id:
             query = query.filter(PinModel.user_id == user_id)
@@ -135,8 +141,40 @@ class MySQLPinRepository(PinRepository):
             .limit(limit)
             .all()
         )
-        return [self._to_entity(m) for m in models]
+        return [self._to_entity_with_user(pin, user) for pin, user in models]
 
+    def _to_entity_with_user(self, pin: PinModel, user: UserModel) -> Pin:
+           return PinResponse(
+        id=pin.id,
+        user_id=pin.user_id,
+        user_username=user.username,
+        user_full_name=user.full_name,
+        user_avatar_url=user.avatar_url,
+        user_is_verified=user.is_verified,
+        image_url=pin.image_url,
+        title=pin.title,
+        description=pin.description,
+        category=pin.category,
+        styles=self._parse_json_list(pin.styles),
+        occasions=self._parse_json_list(pin.occasions),
+        season=pin.season or "todo_el_ano",
+        brands=self._parse_json_list(pin.brands),
+        price_range=pin.price_range or "bajo_500",
+        where_to_buy=pin.where_to_buy,
+        purchase_link=pin.purchase_link,
+        likes_count=pin.likes_count or 0,
+        saves_count=pin.saves_count or 0,
+        comments_count=pin.comments_count or 0,
+        views_count=pin.views_count or 0,
+        colors=self._parse_json_list(pin.colors),
+        tags=self._parse_json_list(pin.tags),
+        is_private=pin.is_private or False,
+        created_at=pin.created_at,
+        updated_at=pin.updated_at,
+        is_liked_by_me=False,   # Ajusta según tu lógica
+        is_saved_by_me=False,   # Ajusta según tu lógica
+    )
+    
     async def get_by_user(
         self,
         user_id: str,

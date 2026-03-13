@@ -1,6 +1,7 @@
 """
 Controlador HTTP de Pins
 """
+from app.internal.pines.domain.entities import pin
 from internal.pines.application.use_cases.create_pin import CreatePinUseCase
 from internal.pines.application.use_cases.get_pin import GetPinUseCase
 from internal.pines.application.use_cases.get_pins import GetPinsUseCase
@@ -50,37 +51,36 @@ class PinController:
 
     @staticmethod
     def _to_response(pin: Pin) -> PinResponse:
-        """Convierte entidad Pin a PinResponse"""
         return PinResponse(
-            id=pin.id,
-            user_id=pin.user_id,
-            user_username="",               # TODO: obtener del usuario real
-            user_full_name="",              # TODO: obtener del usuario real
-            user_avatar_url=None,           # TODO: obtener del usuario real
-            user_is_verified=False,         # TODO: obtener del usuario real
-            image_url=pin.image_url,
-            title=pin.title,
-            description=pin.description,
-            category=pin.category,
-            styles=pin.styles,
-            occasions=pin.occasions,
-            season=pin.season,
-            brands=pin.brands,
-            price_range=pin.price_range,
-            where_to_buy=pin.where_to_buy,
-            purchase_link=pin.purchase_link,
-            likes_count=pin.likes_count,
-            saves_count=pin.saves_count,
-            comments_count=pin.comments_count,
-            views_count=pin.views_count,
-            colors=pin.colors,
-            tags=pin.tags,
-            is_private=pin.is_private,
-            created_at=pin.created_at,
-            updated_at=pin.updated_at,
-            is_liked_by_me=False,           # TODO: verificar con like repo
-            is_saved_by_me=False,           # TODO: verificar con board repo
-        )
+        id=pin.id,
+        user_id=pin.user_id,
+        user_username=getattr(pin, "user_username", ""),      # Usa el valor si existe
+        user_full_name=getattr(pin, "user_full_name", ""),
+        user_avatar_url=getattr(pin, "user_avatar_url", None),
+        user_is_verified=getattr(pin, "user_is_verified", False),
+        image_url=pin.image_url,
+        title=pin.title,
+        description=pin.description,
+        category=pin.category,
+        styles=pin.styles,
+        occasions=pin.occasions,
+        season=pin.season,
+        brands=pin.brands,
+        price_range=pin.price_range,
+        where_to_buy=pin.where_to_buy,
+        purchase_link=pin.purchase_link,
+        likes_count=pin.likes_count,
+        saves_count=pin.saves_count,
+        comments_count=pin.comments_count,
+        views_count=pin.views_count,
+        colors=pin.colors,
+        tags=pin.tags,
+        is_private=pin.is_private,
+        created_at=pin.created_at,
+        updated_at=pin.updated_at,
+        is_liked_by_me=getattr(pin, "is_liked_by_me", False),
+        is_saved_by_me=getattr(pin, "is_saved_by_me", False),
+    )
 
     @staticmethod
     def _to_summary(pin: Pin) -> PinSummary:
