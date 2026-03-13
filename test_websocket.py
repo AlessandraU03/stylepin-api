@@ -8,8 +8,8 @@ import io
 import httpx
 import websockets
 
-BASE_URL = "http://localhost:8000/api/v1"
-WS_URL = "ws://localhost:8000/ws"
+BASE_URL = "https://stylepin.ddns.net/api/v1"
+WS_URL = "wss://stylepin.ddns.net/ws"
 
 
 def create_fake_image() -> bytes:
@@ -59,8 +59,8 @@ async def main():
         # ── 2. Login ambos ────────────────────────────────────
         print("\n🔐 Login usuario A...")
         login_a = await client.post(f"{BASE_URL}/auth/login", json={
-            "identity": "owner_ws6@test.com",
-            "password": "Test1234!",
+          "identity": "ale@amura.com",
+            "password": "Lagartija20_",
         })
         login_a_data = login_a.json()
         token_a = login_a_data.get("token", "")

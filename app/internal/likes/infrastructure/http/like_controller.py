@@ -3,6 +3,7 @@ Controlador HTTP de Likes
 """
 import logging
 
+from app.internal.likes.application.use_cases.toggle_like import ToggleLikeUseCase
 from internal.likes.application.use_cases.like_pin import LikePinUseCase
 from internal.likes.application.use_cases.unlike_pin import UnlikePinUseCase
 from internal.likes.application.use_cases.get_pin_likes import GetPinLikesUseCase
@@ -27,6 +28,7 @@ class LikeController:
         self,
         like_uc: LikePinUseCase,
         unlike_uc: UnlikePinUseCase,
+        toggle_like_uc: ToggleLikeUseCase,
         get_pin_likes_uc: GetPinLikesUseCase,
         get_user_likes_uc: GetUserLikesUseCase,
         check_status_uc: CheckLikeStatusUseCase,
@@ -34,6 +36,7 @@ class LikeController:
     ):
         self._like_uc = like_uc
         self._unlike_uc = unlike_uc
+        self._toggle_like_uc = toggle_like_uc
         self._get_pin_likes_uc = get_pin_likes_uc
         self._get_user_likes_uc = get_user_likes_uc
         self._check_status_uc = check_status_uc
@@ -65,6 +68,22 @@ class LikeController:
             await self._send_like_notification(user_id, body.pin_id)
         except Exception as e:
             logger.warning(f"⚠️ No se pudo enviar notificación de like: {e}")
+
+        return LikeStatusResponse(
+            pin_id=result["pin_id"],
+            is_liked=result["is_liked"],
+            likes_count=result["likes_count"],
+        )
+    
+    async def toggle_like(self, body: LikePinRequest, user_id: str) -> LikeStatusResponse:
+        result = await self._toggle_like_uc.execute(user_id=user_id, pin_id=body.pin_id)
+
+        # 🔔 Enviar notificación solo si se acaba de dar like
+        if result["is_liked"]:
+            try:
+                await self._send_like_notification(user_id, body.pin_id)
+            except Exception as e:
+                logger.warning(f"⚠️ No se pudo enviar notificación de like: {e}")
 
         return LikeStatusResponse(
             pin_id=result["pin_id"],

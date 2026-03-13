@@ -60,12 +60,13 @@ class PinRepository(ABC):
     @abstractmethod
     async def increment_likes(self, pin_id: str) -> None:
         """Incrementar contador de likes"""
-        pass
-    
+    pass
+
     @abstractmethod
     async def decrement_likes(self, pin_id: str) -> None:
         """Decrementar contador de likes"""
         pass
+    
     
     @abstractmethod
     async def increment_saves(self, pin_id: str) -> None:

@@ -198,16 +198,22 @@ class MySQLPinRepository(PinRepository):
         self._db.commit()
 
     async def increment_likes(self, pin_id: str) -> None:
+        """Incrementar contador de likes en la tabla pins"""
         self._db.query(PinModel).filter(
-            PinModel.id == pin_id
-        ).update({PinModel.likes_count: PinModel.likes_count + 1})
+        PinModel.id == pin_id
+    ).update({
+        PinModel.likes_count: PinModel.likes_count + 1
+    })
         self._db.commit()
 
     async def decrement_likes(self, pin_id: str) -> None:
+        """Decrementar contador de likes en la tabla pins"""
         self._db.query(PinModel).filter(
-            PinModel.id == pin_id,
-            PinModel.likes_count > 0,
-        ).update({PinModel.likes_count: PinModel.likes_count - 1})
+        PinModel.id == pin_id,
+        PinModel.likes_count > 0  # ✅ Evitar números negativos
+    ).update({
+        PinModel.likes_count: PinModel.likes_count - 1
+    })
         self._db.commit()
 
     async def increment_saves(self, pin_id: str) -> None:
