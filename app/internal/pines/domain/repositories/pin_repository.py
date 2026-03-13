@@ -3,7 +3,8 @@ Interface del repositorio de Pins (Port)
 """
 from abc import ABC, abstractmethod
 from typing import Optional, List
-from internal.pines.domain.entities.pin import Pin
+from core.database.models import PinModel, UserModel
+from internal.pines.domain.entities.pin import Pin, PinResponse
 
 class PinRepository(ABC):
     """Repositorio de Pins - Interface"""
@@ -100,16 +101,25 @@ class PinRepository(ABC):
     
     @abstractmethod
     async def get_feed(
-        self,
-        user_id: str,
-        limit: int = 20,
-        offset: int = 0
-    ) -> List[Pin]:
-        """
-        Obtener feed personalizado para un usuario
-        (pins de usuarios que sigue)
-        """
-        pass
+    self,
+    user_id: str,
+    limit: int = 20,
+    offset: int = 0,
+        ) -> List[PinResponse]:
+        query = (
+        self._db.query(PinModel, UserModel)
+        .join(UserModel, PinModel.user_id == UserModel.id)
+        .filter(
+            PinModel.is_private == False,
+            PinModel.user_id != user_id,
+        )
+        .order_by(PinModel.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+    )
+        models = query.all()
+
+        return [self._to_entity_with_user(pin, user) for pin, user in models]
     
     @abstractmethod
     async def get_trending(

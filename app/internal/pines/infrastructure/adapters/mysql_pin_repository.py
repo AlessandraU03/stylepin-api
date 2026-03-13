@@ -312,18 +312,18 @@ class MySQLPinRepository(PinRepository):
     # ── Feed ──────────────────────────────────────────────────
 
     async def get_feed(
-        self,
-        user_id: str,
-        limit: int = 20,
-        offset: int = 0,
-    ) -> List[Pin]:
+    self,
+    user_id: str,
+    limit: int = 20,
+    offset: int = 0,
+    ) -> List[PinResponse]:
         """
         Feed personalizado: pins públicos recientes.
-        TODO: Integrar con follows para mostrar solo pins de usuarios seguidos.
-        Por ahora retorna pins públicos excluyendo los del propio usuario.
+        Excluye los del propio usuario.
         """
-        models = (
-            self._db.query(PinModel)
+        query = (
+            self._db.query(PinModel, UserModel)
+            .join(UserModel, PinModel.user_id == UserModel.id)
             .filter(
                 PinModel.is_private == False,
                 PinModel.user_id != user_id,
@@ -331,9 +331,9 @@ class MySQLPinRepository(PinRepository):
             .order_by(PinModel.created_at.desc())
             .offset(offset)
             .limit(limit)
-            .all()
         )
-        return [self._to_entity(m) for m in models]
+        models = query.all()
+        return [self._to_entity_with_user(pin, user) for pin, user in models]
 
     # ── Trending ──────────────────────────────────────────────
 
