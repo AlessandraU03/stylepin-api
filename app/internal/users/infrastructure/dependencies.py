@@ -4,6 +4,7 @@ Inyección de dependencias para Users
 from fastapi import Depends
 from sqlalchemy.orm import Session
 
+from app.internal.users.application.use_cases.save_fcm_token import SaveFcmTokenUseCase
 from core.connection import get_db
 from internal.users.infrastructure.adapters.mysql_user_repository import MySQLUserRepository
 
@@ -37,4 +38,5 @@ def get_user_controller(db: Session = Depends(get_db)) -> UserController:
         update_user_uc=UpdateUserUseCase(repo),
         delete_user_uc=DeleteUserUseCase(repo),
         search_users_uc=SearchUsersUseCase(repo),
-    )
+        save_fcm_token_uc=SaveFcmTokenUseCase(repo),  # 🔥 ESTE FALTABA
+)

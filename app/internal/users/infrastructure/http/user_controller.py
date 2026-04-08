@@ -5,6 +5,7 @@ import token
 
 from passlib.context import CryptContext
 
+from app.internal.users.application.use_cases.save_fcm_token import SaveFcmTokenUseCase
 from internal.users.application.use_cases.get_user import GetUserUseCase
 from internal.users.application.use_cases.update_user import UpdateUserUseCase
 from internal.users.application.use_cases.delete_user import DeleteUserUseCase
@@ -32,11 +33,14 @@ class UserController:
         update_user_uc: UpdateUserUseCase,
         delete_user_uc: DeleteUserUseCase,
         search_users_uc: SearchUsersUseCase,
+        save_fcm_token_uc: SaveFcmTokenUseCase,
     ):
         self._get_user_uc = get_user_uc
         self._update_user_uc = update_user_uc
         self._delete_user_uc = delete_user_uc
         self._search_users_uc = search_users_uc
+        self._save_fcm_token_uc = save_fcm_token_uc
+
 
     # ── Mapeo ─────────────────────────────────────────────────
 
@@ -168,5 +172,5 @@ class UserController:
         )
     
     async def save_fcm_token(self, user_id: str, token: str) -> MessageResponse:
-        await self._update_user_uc.save_fcm_token(user_id, token)
+        await self._save_fcm_token_uc.execute(user_id, token)
         return MessageResponse(message="FCM token guardado")
