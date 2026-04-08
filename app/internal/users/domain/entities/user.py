@@ -30,6 +30,7 @@ class User(BaseModel):
     created_at: datetime
     updated_at: datetime
     last_login: Optional[datetime] = None
+    fcm_token: Optional[str] = None
     
     @field_validator('username')
     @classmethod

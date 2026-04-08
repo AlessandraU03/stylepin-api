@@ -186,3 +186,13 @@ async def get_user_stats(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=str(e)
         )
+    
+    
+
+@router.post("/fcm-token")
+async def save_fcm_token(
+    token: str,
+    user_id: str = Depends(get_current_user_id),
+    controller: UserController = Depends(get_user_controller),
+):
+    return await controller.save_fcm_token(user_id, token)

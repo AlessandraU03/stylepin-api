@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 import time
 import logging
 
+from app.core.firebase import init_firebase
 from core.database.config import settings
 from core.exceptions import (
     UserAlreadyExistsException,
@@ -54,12 +55,16 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("🚀 Starting Amura API...")
-    if settings.DEBUG:
-        logger.info("🗄️ Creating database tables...")
-        Base.metadata.create_all(bind=engine)
-    yield
-    logger.info("👋 Shutting down Amura API...")
 
+    # 🔥 INICIALIZAR FIREBASE
+    init_firebase()
+
+    if settings.DEBUG:
+        Base.metadata.create_all(bind=engine)
+
+    yield
+
+    logger.info("👋 Shutting down Amura API...")
 
 # ==================== APP ====================
 

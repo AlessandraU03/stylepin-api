@@ -1,6 +1,8 @@
 """
 Controlador HTTP de Users
 """
+import token
+
 from passlib.context import CryptContext
 
 from internal.users.application.use_cases.get_user import GetUserUseCase
@@ -164,3 +166,7 @@ class UserController:
             offset=result["offset"],
             has_more=result["has_more"],
         )
+    
+    async def save_fcm_token(self, user_id: str, token: str) -> MessageResponse:
+        await self._update_user_uc.save_fcm_token(user_id, token)
+        return MessageResponse(message="FCM token guardado")

@@ -3,6 +3,7 @@ Caso de uso: Toggle Like (dar/quitar like)
 """
 import uuid
 from datetime import datetime
+from app.core.notifications import send_push
 from internal.likes.domain.entities.like import Like
 from internal.likes.domain.repositories.like_repository import LikeRepository
 from internal.pines.domain.repositories.pin_repository import PinRepository
@@ -49,23 +50,24 @@ class ToggleLikeUseCase:
             }
         else:
             # ===== DAR LIKE =====
+           # ===== DAR LIKE =====
             like = Like(
                 id=str(uuid.uuid4()),
                 user_id=user_id,
                 pin_id=pin_id,
                 created_at=datetime.utcnow()
             )
-            
+
             await self.like_repository.create(like)
-            
-            # ✅ INCREMENTAR CONTADOR EN PIN
             await self.pin_repository.increment_likes(pin_id)
-            
-            # Obtener el pin actualizado
-            updated_pin = await self.pin_repository.get_by_id(pin_id)
-            
-            return {
-                "pin_id": pin_id,
-                "is_liked": True,
-                "likes_count": updated_pin.likes_count
-            }
+
+            # 🔥 OBTENER OWNER DEL PIN
+            owner = await self.pin_repository.get_owner(pin_id)
+
+            # 🔥 ENVIAR NOTIFICACIÓN
+            if owner and owner.fcm_token:
+                await send_push(
+                    token=owner.fcm_token,
+                    title="Nuevo Like ❤️",
+                    body=f"Alguien le dio like a tu publicación"
+                )

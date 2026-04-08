@@ -63,6 +63,7 @@ class UserModel(Base):
     created_at = Column(TIMESTAMP, server_default=func.now())
     updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
     last_login = Column(TIMESTAMP, nullable=True)
+    fcm_token = Column(String(255), nullable=True)
 
 # ==================== PINS ====================
 
