@@ -1,1 +1,1 @@
-from core.database.models import PinModel
+from core.database.models import Pin

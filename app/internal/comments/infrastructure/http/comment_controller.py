@@ -89,13 +89,13 @@ class CommentController:
         if not self._db:
             return
 
-        from core.database.models import PinModel, UserModel
+        from core.database.models import Pin, User
 
-        pin = self._db.query(PinModel).filter(PinModel.id == pin_id).first()
+        pin = self._db.query(Pin).filter(Pin.id == pin_id).first()
         if not pin or pin.user_id == commenter_id:
             return
 
-        commenter = self._db.query(UserModel).filter(UserModel.id == commenter_id).first()
+        commenter = self._db.query(User).filter(User.id == commenter_id).first()
         commenter_username = commenter.username if commenter else "alguien"
 
         await notify_new_comment(

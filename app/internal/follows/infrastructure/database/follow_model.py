@@ -1,1 +1,1 @@
-from core.database.models import FollowModel
+from core.database.models import Follow

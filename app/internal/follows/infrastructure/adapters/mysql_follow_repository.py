@@ -10,7 +10,7 @@ from sqlalchemy import func, and_
 
 from internal.follows.domain.entities.follow import Follow
 from internal.follows.domain.repositories.follow_repository import FollowRepository
-from core.database.models import FollowModel
+from core.database.models import Follow
 
 
 class MySQLFollowRepository(FollowRepository):
@@ -21,7 +21,7 @@ class MySQLFollowRepository(FollowRepository):
     # ── Mapeo ─────────────────────────────────────────────────
 
     @staticmethod
-    def _to_entity(model: FollowModel) -> Follow:
+    def _to_entity(model: Follow) -> Follow:
         return Follow(
             id=model.id,
             follower_id=model.follower_id,
@@ -32,7 +32,7 @@ class MySQLFollowRepository(FollowRepository):
     # ── CRUD ──────────────────────────────────────────────────
 
     async def create(self, follow: Follow) -> Follow:
-        model = FollowModel(
+        model = Follow(
             id=str(uuid.uuid4()),
             follower_id=follow.follower_id,
             following_id=follow.following_id,
@@ -44,10 +44,10 @@ class MySQLFollowRepository(FollowRepository):
         return self._to_entity(model)
 
     async def delete(self, follower_id: str, following_id: str) -> bool:
-        deleted = self._db.query(FollowModel).filter(
+        deleted = self._db.query(Follow).filter(
             and_(
-                FollowModel.follower_id == follower_id,
-                FollowModel.following_id == following_id,
+                Follow.follower_id == follower_id,
+                Follow.following_id == following_id,
             )
         ).delete()
         self._db.commit()
@@ -57,9 +57,9 @@ class MySQLFollowRepository(FollowRepository):
         self, user_id: str, limit: int = 50, offset: int = 0
     ) -> List[Follow]:
         models = (
-            self._db.query(FollowModel)
-            .filter(FollowModel.following_id == user_id)
-            .order_by(FollowModel.created_at.desc())
+            self._db.query(Follow)
+            .filter(Follow.following_id == user_id)
+            .order_by(Follow.created_at.desc())
             .offset(offset)
             .limit(limit)
             .all()
@@ -70,9 +70,9 @@ class MySQLFollowRepository(FollowRepository):
         self, user_id: str, limit: int = 50, offset: int = 0
     ) -> List[Follow]:
         models = (
-            self._db.query(FollowModel)
-            .filter(FollowModel.follower_id == user_id)
-            .order_by(FollowModel.created_at.desc())
+            self._db.query(Follow)
+            .filter(Follow.follower_id == user_id)
+            .order_by(Follow.created_at.desc())
             .offset(offset)
             .limit(limit)
             .all()
@@ -81,11 +81,11 @@ class MySQLFollowRepository(FollowRepository):
 
     async def exists(self, follower_id: str, following_id: str) -> bool:
         count = (
-            self._db.query(func.count(FollowModel.id))
+            self._db.query(func.count(Follow.id))
             .filter(
                 and_(
-                    FollowModel.follower_id == follower_id,
-                    FollowModel.following_id == following_id,
+                    Follow.follower_id == follower_id,
+                    Follow.following_id == following_id,
                 )
             )
             .scalar()
@@ -94,30 +94,30 @@ class MySQLFollowRepository(FollowRepository):
 
     async def count_followers(self, user_id: str) -> int:
         return (
-            self._db.query(func.count(FollowModel.id))
-            .filter(FollowModel.following_id == user_id)
+            self._db.query(func.count(Follow.id))
+            .filter(Follow.following_id == user_id)
             .scalar()
         ) or 0
 
     async def count_following(self, user_id: str) -> int:
         return (
-            self._db.query(func.count(FollowModel.id))
-            .filter(FollowModel.follower_id == user_id)
+            self._db.query(func.count(Follow.id))
+            .filter(Follow.follower_id == user_id)
             .scalar()
         ) or 0
 
     async def get_follower_ids(self, user_id: str) -> List[str]:
         rows = (
-            self._db.query(FollowModel.follower_id)
-            .filter(FollowModel.following_id == user_id)
+            self._db.query(Follow.follower_id)
+            .filter(Follow.following_id == user_id)
             .all()
         )
         return [row[0] for row in rows]
 
     async def get_following_ids(self, user_id: str) -> List[str]:
         rows = (
-            self._db.query(FollowModel.following_id)
-            .filter(FollowModel.follower_id == user_id)
+            self._db.query(Follow.following_id)
+            .filter(Follow.follower_id == user_id)
             .all()
         )
         return [row[0] for row in rows]

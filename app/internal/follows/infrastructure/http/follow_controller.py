@@ -73,9 +73,9 @@ class FollowController:
         if not self._db:
             return
 
-        from core.database.models import UserModel
+        from core.database.models import User
 
-        follower = self._db.query(UserModel).filter(UserModel.id == follower_id).first()
+        follower = self._db.query(User).filter(User.id == follower_id).first()
         follower_username = follower.username if follower else "alguien"
 
         await notify_new_follow(

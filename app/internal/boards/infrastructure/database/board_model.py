@@ -1,1 +1,1 @@
-from core.database.models import BoardModel, BoardPinModel, BoardCollaboratorModel
+from core.database.models import Board, BoardPin, BoardCollaborator

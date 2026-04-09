@@ -10,7 +10,7 @@ from sqlalchemy import func, and_
 
 from internal.likes.domain.entities.like import Like
 from internal.likes.domain.repositories.like_repository import LikeRepository
-from core.database.models import LikeModel
+from core.database.models import Like
 
 
 class MySQLLikeRepository(LikeRepository):
@@ -21,7 +21,7 @@ class MySQLLikeRepository(LikeRepository):
     # ── Mapeo ─────────────────────────────────────────────────
 
     @staticmethod
-    def _to_entity(model: LikeModel) -> Like:
+    def _to_entity(model: Like) -> Like:
         return Like(
             id=model.id,
             user_id=model.user_id,
@@ -32,7 +32,7 @@ class MySQLLikeRepository(LikeRepository):
     # ── CRUD ──────────────────────────────────────────────────
 
     async def create(self, like: Like) -> Like:
-        model = LikeModel(
+        model = Like(
             id=str(uuid.uuid4()),
             user_id=like.user_id,
             pin_id=like.pin_id,
@@ -44,10 +44,10 @@ class MySQLLikeRepository(LikeRepository):
         return self._to_entity(model)
 
     async def delete(self, user_id: str, pin_id: str) -> bool:
-        deleted = self._db.query(LikeModel).filter(
+        deleted = self._db.query(Like).filter(
             and_(
-                LikeModel.user_id == user_id,
-                LikeModel.pin_id == pin_id,
+                Like.user_id == user_id,
+                Like.pin_id == pin_id,
             )
         ).delete()
         self._db.commit()
@@ -55,9 +55,9 @@ class MySQLLikeRepository(LikeRepository):
 
     async def get_by_pin(self, pin_id: str, limit: int = 50) -> List[Like]:
         models = (
-            self._db.query(LikeModel)
-            .filter(LikeModel.pin_id == pin_id)
-            .order_by(LikeModel.created_at.desc())
+            self._db.query(Like)
+            .filter(Like.pin_id == pin_id)
+            .order_by(Like.created_at.desc())
             .limit(limit)
             .all()
         )
@@ -67,9 +67,9 @@ class MySQLLikeRepository(LikeRepository):
         self, user_id: str, limit: int = 50, offset: int = 0
     ) -> List[Like]:
         models = (
-            self._db.query(LikeModel)
-            .filter(LikeModel.user_id == user_id)
-            .order_by(LikeModel.created_at.desc())
+            self._db.query(Like)
+            .filter(Like.user_id == user_id)
+            .order_by(Like.created_at.desc())
             .offset(offset)
             .limit(limit)
             .all()
@@ -78,11 +78,11 @@ class MySQLLikeRepository(LikeRepository):
 
     async def exists(self, user_id: str, pin_id: str) -> bool:
         count = (
-            self._db.query(func.count(LikeModel.id))
+            self._db.query(func.count(Like.id))
             .filter(
                 and_(
-                    LikeModel.user_id == user_id,
-                    LikeModel.pin_id == pin_id,
+                    Like.user_id == user_id,
+                    Like.pin_id == pin_id,
                 )
             )
             .scalar()
@@ -91,14 +91,14 @@ class MySQLLikeRepository(LikeRepository):
 
     async def count_by_pin(self, pin_id: str) -> int:
         return (
-            self._db.query(func.count(LikeModel.id))
-            .filter(LikeModel.pin_id == pin_id)
+            self._db.query(func.count(Like.id))
+            .filter(Like.pin_id == pin_id)
             .scalar()
         ) or 0
 
     async def count_by_user(self, user_id: str) -> int:
         return (
-            self._db.query(func.count(LikeModel.id))
-            .filter(LikeModel.user_id == user_id)
+            self._db.query(func.count(Like.id))
+            .filter(Like.user_id == user_id)
             .scalar()
         ) or 0

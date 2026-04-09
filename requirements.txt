@@ -27,3 +27,6 @@ cloudinary
 # WebSocket
 websockets
 firebase-admin
+
+# Notifications
+google-cloud-firestore

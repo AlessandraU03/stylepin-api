@@ -108,16 +108,16 @@ class LikeController:
         if not self._db:
             return
 
-        from core.database.models import PinModel
-        from core.database.models import UserModel
+        from core.database.models import Pin
+        from core.database.models import User
 
         # Obtener pin
-        pin = self._db.query(PinModel).filter(PinModel.id == pin_id).first()
+        pin = self._db.query(Pin).filter(Pin.id == pin_id).first()
         if not pin or pin.user_id == liker_user_id:
             return  # No notificar si es tu propio pin
 
         # Obtener username del que dio like
-        liker = self._db.query(UserModel).filter(UserModel.id == liker_user_id).first()
+        liker = self._db.query(User).filter(User.id == liker_user_id).first()
         liker_username = liker.username if liker else "alguien"
 
         await notify_new_like(

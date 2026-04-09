@@ -19,15 +19,18 @@ from core.exceptions import (
 from core.connection import engine, Base
 
 # ── Importar modelos para que SQLAlchemy los registre ─────────
+# ✅ CAMBIAR NOMBRES - Sin "Model"
 from core.database.models import (
-    UserModel,
-    PinModel,
-    BoardModel,
-    BoardPinModel,
-    BoardCollaboratorModel,
-    LikeModel,
-    FollowModel,
-    CommentModel,
+    User,
+    Pin,
+    Board,
+    BoardPin,
+    BoardCollaborator,
+    Like,
+    Follow,
+    Comment,
+    Notification,  # ← NUEVO
+    FCMToken,      # ← NUEVO
 )
 
 # ── Importar routers ──────────────────────────────────────────
@@ -44,6 +47,9 @@ from core.upload_routes import router as upload_router
 
 # ── WebSocket ─────────────────────────────────────────────────
 from core.websocket_routes import router as ws_router
+
+# ── Notificaciones ────────────────────────────────────────────
+from app.internal.notifications.infrastructure.http.notification_routes import router as notifications_router
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -85,6 +91,7 @@ app = FastAPI(
     * **Sistema social** (follows, likes, comments)
     * **Upload de imágenes** (Cloudinary)
     * **WebSocket** (notificaciones en tiempo real)
+    * **🔥 Notificaciones Push** (Firebase Cloud Messaging)
 
     ### 🔐 Autenticación:
 
@@ -99,6 +106,12 @@ app = FastAPI(
 
     1. `POST /api/v1/upload/pin-image` → sube imagen y obtiene URL
     2. `POST /api/v1/pins` → crea pin usando la URL obtenida
+
+    ### 🔔 Notificaciones:
+
+    1. `POST /api/v1/notifications/register-fcm-token` → registra dispositivo
+    2. `GET /api/v1/notifications/` → obtiene notificaciones
+    3. `PUT /api/v1/notifications/{id}/read` → marca como leída
 
     ### 🔌 WebSocket:
 
@@ -247,6 +260,10 @@ app.include_router(boards_router, prefix="/api/v1")
 app.include_router(likes_router, prefix="/api/v1")
 app.include_router(follows_router, prefix="/api/v1")
 app.include_router(comments_router, prefix="/api/v1")
+
+# ✅ NUEVO: Router de notificaciones
+app.include_router(notifications_router, prefix="/api/v1")
+
 app.include_router(upload_router, prefix="/api/v1")
 
 # WebSocket router (sin prefix — se conecta en ws://host/ws)
@@ -267,4 +284,5 @@ async def root():
         "redoc": "/redoc",
         "health": "/health",
         "websocket": "ws://localhost:3000/ws?token=<JWT_TOKEN>",
+        "notifications": "/api/v1/notifications",
     }

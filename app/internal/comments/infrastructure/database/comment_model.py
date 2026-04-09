@@ -1,1 +1,1 @@
-from core.database.models import CommentModel
+from core.database.models import Comment

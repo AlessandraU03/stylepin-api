@@ -11,7 +11,7 @@ from sqlalchemy import func, or_, and_
 
 from internal.pines.domain.entities.pin import Pin, PinResponse
 from internal.pines.domain.repositories.pin_repository import PinRepository
-from core.database.models import PinModel, UserModel
+from core.database.models import Pin, User
 
 
 class MySQLPinRepository(PinRepository):
@@ -43,7 +43,7 @@ class MySQLPinRepository(PinRepository):
             return json.dumps(value)
         return None
 
-    def _to_entity(self, model: PinModel) -> Pin:
+    def _to_entity(self, model: Pin) -> Pin:
         return Pin(
             id=model.id,
             user_id=model.user_id,
@@ -73,7 +73,7 @@ class MySQLPinRepository(PinRepository):
 
     async def create(self, pin: Pin) -> Pin:
         now = datetime.now(timezone.utc)
-        model = PinModel(
+        model = Pin(
             id=str(uuid.uuid4()),
             user_id=pin.user_id,
             image_url=pin.image_url,
@@ -103,8 +103,8 @@ class MySQLPinRepository(PinRepository):
         return self._to_entity(model)
 
     async def get_by_id(self, pin_id: str) -> Optional[Pin]:
-        model = self._db.query(PinModel).filter(
-            PinModel.id == pin_id
+        model = self._db.query(Pin).filter(
+            Pin.id == pin_id
         ).first()
         return self._to_entity(model) if model else None
 
@@ -120,30 +120,30 @@ class MySQLPinRepository(PinRepository):
         price_range: Optional[str] = None,
     ) -> List[Pin]:
         query = (
-            self._db.query(PinModel, UserModel)
-            .join(UserModel, PinModel.user_id == UserModel.id)
-            .filter(PinModel.is_private == False)
+            self._db.query(Pin, User)
+            .join(User, Pin.user_id == User.id)
+            .filter(Pin.is_private == False)
         )
 
         if user_id:
-            query = query.filter(PinModel.user_id == user_id)
+            query = query.filter(Pin.user_id == user_id)
         if category:
-            query = query.filter(PinModel.category == category)
+            query = query.filter(Pin.category == category)
         if season:
-            query = query.filter(PinModel.season == season)
+            query = query.filter(Pin.season == season)
         if price_range:
-            query = query.filter(PinModel.price_range == price_range)
+            query = query.filter(Pin.price_range == price_range)
 
         models = (
             query
-            .order_by(PinModel.created_at.desc())
+            .order_by(Pin.created_at.desc())
             .offset(offset)
             .limit(limit)
             .all()
         )
         return [self._to_entity_with_user(pin, user) for pin, user in models]
 
-    def _to_entity_with_user(self, pin: PinModel, user: UserModel) -> Pin:
+    def _to_entity_with_user(self, pin: Pin, user: User) -> Pin:
            return PinResponse(
         id=pin.id,
         user_id=pin.user_id,
@@ -182,14 +182,14 @@ class MySQLPinRepository(PinRepository):
         offset: int = 0,
         include_private: bool = False,
     ) -> List[Pin]:
-        query = self._db.query(PinModel).filter(PinModel.user_id == user_id)
+        query = self._db.query(Pin).filter(Pin.user_id == user_id)
 
         if not include_private:
-            query = query.filter(PinModel.is_private == False)
+            query = query.filter(Pin.is_private == False)
 
         models = (
             query
-            .order_by(PinModel.created_at.desc())
+            .order_by(Pin.created_at.desc())
             .offset(offset)
             .limit(limit)
             .all()
@@ -197,8 +197,8 @@ class MySQLPinRepository(PinRepository):
         return [self._to_entity(m) for m in models]
 
     async def update(self, pin: Pin) -> Pin:
-        model = self._db.query(PinModel).filter(
-            PinModel.id == pin.id
+        model = self._db.query(Pin).filter(
+            Pin.id == pin.id
         ).first()
         if model:
             model.title = pin.title
@@ -221,8 +221,8 @@ class MySQLPinRepository(PinRepository):
         return pin
 
     async def delete(self, pin_id: str) -> bool:
-        deleted = self._db.query(PinModel).filter(
-            PinModel.id == pin_id
+        deleted = self._db.query(Pin).filter(
+            Pin.id == pin_id
         ).delete()
         self._db.commit()
         return deleted > 0
@@ -230,54 +230,54 @@ class MySQLPinRepository(PinRepository):
     # ── Contadores ────────────────────────────────────────────
 
     async def increment_views(self, pin_id: str) -> None:
-        self._db.query(PinModel).filter(
-            PinModel.id == pin_id
-        ).update({PinModel.views_count: PinModel.views_count + 1})
+        self._db.query(Pin).filter(
+            Pin.id == pin_id
+        ).update({Pin.views_count: Pin.views_count + 1})
         self._db.commit()
 
     async def increment_likes(self, pin_id: str) -> None:
         """Incrementar contador de likes en la tabla pins"""
-        self._db.query(PinModel).filter(
-        PinModel.id == pin_id
+        self._db.query(Pin).filter(
+        Pin.id == pin_id
     ).update({
-        PinModel.likes_count: PinModel.likes_count + 1
+        Pin.likes_count: Pin.likes_count + 1
     })
         self._db.commit()
 
     async def decrement_likes(self, pin_id: str) -> None:
         """Decrementar contador de likes en la tabla pins"""
-        self._db.query(PinModel).filter(
-        PinModel.id == pin_id,
-        PinModel.likes_count > 0  # ✅ Evitar números negativos
+        self._db.query(Pin).filter(
+        Pin.id == pin_id,
+        Pin.likes_count > 0  # ✅ Evitar números negativos
     ).update({
-        PinModel.likes_count: PinModel.likes_count - 1
+        Pin.likes_count: Pin.likes_count - 1
     })
         self._db.commit()
 
     async def increment_saves(self, pin_id: str) -> None:
-        self._db.query(PinModel).filter(
-            PinModel.id == pin_id
-        ).update({PinModel.saves_count: PinModel.saves_count + 1})
+        self._db.query(Pin).filter(
+            Pin.id == pin_id
+        ).update({Pin.saves_count: Pin.saves_count + 1})
         self._db.commit()
 
     async def decrement_saves(self, pin_id: str) -> None:
-        self._db.query(PinModel).filter(
-            PinModel.id == pin_id,
-            PinModel.saves_count > 0,
-        ).update({PinModel.saves_count: PinModel.saves_count - 1})
+        self._db.query(Pin).filter(
+            Pin.id == pin_id,
+            Pin.saves_count > 0,
+        ).update({Pin.saves_count: Pin.saves_count - 1})
         self._db.commit()
 
     async def increment_comments(self, pin_id: str) -> None:
-        self._db.query(PinModel).filter(
-            PinModel.id == pin_id
-        ).update({PinModel.comments_count: PinModel.comments_count + 1})
+        self._db.query(Pin).filter(
+            Pin.id == pin_id
+        ).update({Pin.comments_count: Pin.comments_count + 1})
         self._db.commit()
 
     async def decrement_comments(self, pin_id: str) -> None:
-        self._db.query(PinModel).filter(
-            PinModel.id == pin_id,
-            PinModel.comments_count > 0,
-        ).update({PinModel.comments_count: PinModel.comments_count - 1})
+        self._db.query(Pin).filter(
+            Pin.id == pin_id,
+            Pin.comments_count > 0,
+        ).update({Pin.comments_count: Pin.comments_count - 1})
         self._db.commit()
 
     # ── Búsqueda ──────────────────────────────────────────────
@@ -290,19 +290,19 @@ class MySQLPinRepository(PinRepository):
     ) -> List[Pin]:
         search_term = f"%{query}%"
         models = (
-            self._db.query(PinModel)
+            self._db.query(Pin)
             .filter(
-                PinModel.is_private == False,
+                Pin.is_private == False,
                 or_(
-                    PinModel.title.ilike(search_term),
-                    PinModel.description.ilike(search_term),
-                    PinModel.tags.ilike(search_term),
-                    PinModel.category.ilike(search_term),
-                    PinModel.brands.ilike(search_term),
-                    PinModel.colors.ilike(search_term),
+                    Pin.title.ilike(search_term),
+                    Pin.description.ilike(search_term),
+                    Pin.tags.ilike(search_term),
+                    Pin.category.ilike(search_term),
+                    Pin.brands.ilike(search_term),
+                    Pin.colors.ilike(search_term),
                 )
             )
-            .order_by(PinModel.created_at.desc())
+            .order_by(Pin.created_at.desc())
             .offset(offset)
             .limit(limit)
             .all()
@@ -322,13 +322,13 @@ class MySQLPinRepository(PinRepository):
         Excluye los del propio usuario.
         """
         query = (
-            self._db.query(PinModel, UserModel)
-            .join(UserModel, PinModel.user_id == UserModel.id)
+            self._db.query(Pin, User)
+            .join(User, Pin.user_id == User.id)
             .filter(
-                PinModel.is_private == False,
-                PinModel.user_id != user_id,
+                Pin.is_private == False,
+                Pin.user_id != user_id,
             )
-            .order_by(PinModel.created_at.desc())
+            .order_by(Pin.created_at.desc())
             .offset(offset)
             .limit(limit)
         )
@@ -345,13 +345,13 @@ class MySQLPinRepository(PinRepository):
         """Pins trending: más likes + views en las últimas X horas"""
         cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
         models = (
-            self._db.query(PinModel)
+            self._db.query(Pin)
             .filter(
-                PinModel.is_private == False,
-                PinModel.created_at >= cutoff,
+                Pin.is_private == False,
+                Pin.created_at >= cutoff,
             )
             .order_by(
-                (PinModel.likes_count + PinModel.views_count).desc()
+                (Pin.likes_count + Pin.views_count).desc()
             )
             .limit(limit)
             .all()

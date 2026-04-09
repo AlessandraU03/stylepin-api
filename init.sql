@@ -190,3 +190,52 @@ CREATE TABLE IF NOT EXISTS comments (
     INDEX idx_parent_comment_id (parent_comment_id),
     INDEX idx_created_at (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ...existing code...
+
+-- =====================================================
+-- TABLA: notifications
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS notifications (
+    id VARCHAR(36) PRIMARY KEY,
+    user_id VARCHAR(36) NOT NULL,
+    actor_id VARCHAR(36) NOT NULL,
+    type ENUM('like', 'follow', 'comment', 'board_collaboration') NOT NULL,
+    pin_id VARCHAR(36) NULL,
+    comment_id VARCHAR(36) NULL,
+    board_id VARCHAR(36) NULL,
+    title VARCHAR(255) NOT NULL,
+    body TEXT NOT NULL,
+    is_read BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    read_at TIMESTAMP NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (actor_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (pin_id) REFERENCES pins(id) ON DELETE SET NULL,
+    FOREIGN KEY (comment_id) REFERENCES comments(id) ON DELETE SET NULL,
+    FOREIGN KEY (board_id) REFERENCES boards(id) ON DELETE SET NULL,
+    INDEX idx_user_id (user_id),
+    INDEX idx_actor_id (actor_id),
+    INDEX idx_is_read (is_read),
+    INDEX idx_created_at (created_at),
+    INDEX idx_type (type)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =====================================================
+-- TABLA: fcm_tokens (Firebase Cloud Messaging)
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS fcm_tokens (
+    id VARCHAR(36) PRIMARY KEY,
+    user_id VARCHAR(36) NOT NULL,
+    device_token VARCHAR(500) NOT NULL,
+    device_name VARCHAR(100),
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE KEY unique_user_device_token (user_id, device_token),
+    INDEX idx_user_id (user_id),
+    INDEX idx_is_active (is_active)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

@@ -40,3 +40,4 @@ def get_board_controller(db: Session = Depends(get_db)) -> BoardController:
         remove_collab_uc=RemoveCollaboratorUseCase(board_repo),
         update_collab_uc=UpdateCollaboratorUseCase(board_repo),
     )
+

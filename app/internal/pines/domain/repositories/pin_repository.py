@@ -3,7 +3,7 @@ Interface del repositorio de Pins (Port)
 """
 from abc import ABC, abstractmethod
 from typing import Optional, List
-from core.database.models import PinModel, UserModel
+from core.database.models import Pin, User
 from internal.pines.domain.entities.pin import Pin, PinResponse
 
 class PinRepository(ABC):
@@ -107,13 +107,13 @@ class PinRepository(ABC):
     offset: int = 0,
         ) -> List[PinResponse]:
         query = (
-        self._db.query(PinModel, UserModel)
-        .join(UserModel, PinModel.user_id == UserModel.id)
+        self._db.query(Pin, User)
+        .join(User, Pin.user_id == User.id)
         .filter(
-            PinModel.is_private == False,
-            PinModel.user_id != user_id,
+            Pin.is_private == False,
+            Pin.user_id != user_id,
         )
-        .order_by(PinModel.created_at.desc())
+        .order_by(Pin.created_at.desc())
         .offset(offset)
         .limit(limit)
     )

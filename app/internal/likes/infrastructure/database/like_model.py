@@ -1,1 +1,1 @@
-from core.database.models import LikeModel
+from core.database.models import Like
