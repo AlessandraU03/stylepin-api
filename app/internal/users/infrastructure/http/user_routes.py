@@ -2,7 +2,7 @@
 Rutas HTTP de Users
 """
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from typing import Annotated
+from typing import Annotated, Optional
 
 from internal.users.domain.entities.user import UserMe
 from internal.users.application.schemas.user_schema import (
@@ -137,17 +137,19 @@ async def search_users(
 
 # ====================== FCM TOKEN ======================
 
+
 @router.post(
     "/fcm-token",
     summary="Guardar token FCM para notificaciones push",
 )
 async def save_fcm_token(
     token: str,
+    device_name: Optional[str] = None,  # ✅ AGREGAR
     user_id: str = Depends(get_current_user_id),
     controller: UserController = Depends(get_user_controller),
 ):
-    return await controller.save_fcm_token(user_id, token)
-
+    result = await controller.save_fcm_token(user_id, token, device_name)
+    return result  # ✅ Retornar respuesta completa del use case
 
 # ====================== TEST NOTIFICATION (🔥 ANTES DE /{user_id}) ======================
 

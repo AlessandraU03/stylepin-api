@@ -2,6 +2,8 @@
 Controlador HTTP de Users
 """
 import token
+from typing import Optional
+from unittest import result
 
 from passlib.context import CryptContext
 
@@ -171,6 +173,9 @@ class UserController:
             has_more=result["has_more"],
         )
     
-    async def save_fcm_token(self, user_id: str, token: str) -> MessageResponse:
-        await self._save_fcm_token_uc.execute(user_id, token)
-        return MessageResponse(message="FCM token guardado")
+# ...existing code...
+
+    async def save_fcm_token(self, user_id: str, token: str, device_name: Optional[str] = None) -> dict:
+        """Guardar token FCM"""
+        result = await self._save_fcm_token_uc.execute(user_id, token, device_name)
+        return result  # ✅ Retornar toda la respuesta
