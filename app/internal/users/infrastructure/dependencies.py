@@ -38,5 +38,5 @@ def get_user_controller(db: Session = Depends(get_db)) -> UserController:
         update_user_uc=UpdateUserUseCase(repo),
         delete_user_uc=DeleteUserUseCase(repo),
         search_users_uc=SearchUsersUseCase(repo),
-        save_fcm_token_uc=SaveFcmTokenUseCase(repo),  # 🔥 ESTE FALTABA
-)
+        save_fcm_token_uc=SaveFcmTokenUseCase(db),  # ✅ CAMBIAR: pasar db, NO repo
+    )
