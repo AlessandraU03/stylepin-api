@@ -135,6 +135,71 @@ async def search_users(
         )
 
 
+# ====================== FCM TOKEN ======================
+
+@router.post(
+    "/fcm-token",
+    summary="Guardar token FCM para notificaciones push",
+)
+async def save_fcm_token(
+    token: str,
+    user_id: str = Depends(get_current_user_id),
+    controller: UserController = Depends(get_user_controller),
+):
+    return await controller.save_fcm_token(user_id, token)
+
+
+# ====================== TEST NOTIFICATION (🔥 ANTES DE /{user_id}) ======================
+
+@router.get(
+    "/test-notification",
+    summary="Enviar notificación de prueba",
+)
+async def test_notification(
+    user_id: str = Depends(get_current_user_id),
+    controller: UserController = Depends(get_user_controller),
+):
+    print("USER_ID DEL TOKEN:", user_id)
+
+    # 🔍 Obtener usuario real desde DB
+    user = await controller._get_user_uc.execute_by_id(user_id)
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Usuario no encontrado en DB"
+        )
+
+    if not user.fcm_token:
+        return {
+            "error": "El usuario no tiene FCM token",
+            "user_id": user_id
+        }
+
+    # 🔔 Enviar notificación
+    try:
+        from core.notifications import send_push
+
+        result = await send_push(
+            token=user.fcm_token,
+            title="PRUEBA 🔥",
+            body="Si ves esto, Firebase funciona correctamente"
+        )
+
+        print("RESULTADO FIREBASE:", result)
+
+        return {
+            "message": "Notificación enviada",
+            "firebase_response": result,
+            "user_id": user_id
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al enviar notificación: {str(e)}"
+        )
+
+
 # ====================== PERFIL PÚBLICO ======================
 
 @router.get(
@@ -148,23 +213,6 @@ async def get_profile(
 ):
     try:
         return await controller.get_profile(username)
-    except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(e)
-        )
-
-
-@router.get(
-    "/{user_id}",
-    response_model=UserProfileResponse,
-    summary="Ver perfil de un usuario por ID",
-)
-async def get_user(
-    user_id: str,
-    controller: UserController = Depends(get_user_controller),
-):
-    try:
-        return await controller.get_user_by_id(user_id)
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=str(e)
@@ -186,53 +234,20 @@ async def get_user_stats(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=str(e)
         )
-    
-    
 
-# ====================== FCM TOKEN ======================
 
-@router.post("/fcm-token")
-async def save_fcm_token(
-    token: str,
-    user_id: str = Depends(get_current_user_id),
+@router.get(
+    "/{user_id}",
+    response_model=UserProfileResponse,
+    summary="Ver perfil de un usuario por ID",
+)
+async def get_user(
+    user_id: str,
     controller: UserController = Depends(get_user_controller),
 ):
-    return await controller.save_fcm_token(user_id, token)
-
-
-# ====================== TEST NOTIFICATION (🔥 IMPORTANTE ARRIBA) ======================
-
-@router.get("/test-notification")
-async def test_notification(
-    user_id: str = Depends(get_current_user_id),
-    controller: UserController = Depends(get_user_controller),
-):
-    print("USER_ID DEL TOKEN:", user_id)
-
-    # 🔍 Obtener usuario real desde DB
-    user = await controller._get_user_uc.execute_by_id(user_id)
-
-    if not user:
+    try:
+        return await controller.get_user_by_id(user_id)
+    except ValueError as e:
         raise HTTPException(
-            status_code=404,
-            detail="Usuario no encontrado en DB"
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(e)
         )
-
-    if not user.fcm_token:
-        return {"error": "El usuario no tiene FCM token"}
-
-    # 🔔 Enviar notificación
-    from core.notifications import send_push
-
-    result = await send_push(
-        token=user.fcm_token,
-        title="PRUEBA 🔥",
-        body="Si ves esto, Firebase funciona correctamente"
-    )
-
-    print("RESULTADO FIREBASE:", result)
-
-    return {
-        "message": "Notificación enviada",
-        "firebase_response": result
-    }

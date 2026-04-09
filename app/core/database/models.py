@@ -71,14 +71,22 @@ class Pin(Base):
     user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     title = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
-    image_url = Column(String(500), nullable=True)
-    source_url = Column(String(500), nullable=True)
+    image_url = Column(String(500), nullable=False)  # ✅ REQUIRED
     category = Column(String(100), nullable=True)
+    styles = Column(Text, nullable=True)  # ✅ AGREGAR (JSON como TEXT)
+    occasions = Column(Text, nullable=True)  # ✅ AGREGAR
     season = Column(String(50), nullable=True)
+    brands = Column(Text, nullable=True)  # ✅ AGREGAR
     price_range = Column(String(50), nullable=True)
-    is_private = Column(Boolean, default=False)
+    where_to_buy = Column(String(200), nullable=True)  # ✅ AGREGAR
+    purchase_link = Column(String(500), nullable=True)  # ✅ AGREGAR
     likes_count = Column(Integer, default=0)
+    saves_count = Column(Integer, default=0)  # ✅ AGREGAR
     comments_count = Column(Integer, default=0)
+    views_count = Column(Integer, default=0)  # ✅ AGREGAR
+    colors = Column(Text, nullable=True)  # ✅ AGREGAR
+    tags = Column(Text, nullable=True)  # ✅ AGREGAR
+    is_private = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -92,7 +100,6 @@ class Pin(Base):
         Index('idx_is_private', 'is_private'),
         Index('idx_user_id', 'user_id'),
     )
-
 # =====================================================
 # LIKES
 # =====================================================
