@@ -24,14 +24,25 @@ class User(Base):
     __tablename__ = "users"
     
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    username = Column(String(50), unique=True, nullable=False)
-    email = Column(String(100), unique=True, nullable=False)
-    hashed_password = Column(String(255), nullable=False)
-    profile_picture = Column(String(500), nullable=True)
+    username = Column(String(30), unique=True, nullable=False)
+    email = Column(String(255), unique=True, nullable=False)
+    password_hash = Column(String(255), nullable=False)  # ✅ NO hashed_password
+    full_name = Column(String(100), nullable=False)  # ✅ AGREGAR
     bio = Column(Text, nullable=True)
+    avatar_url = Column(String(500), nullable=True)  # ✅ NO profile_picture
+    gender = Column(String(50), default="prefer_not_to_say")  # ✅ AGREGAR
+    preferred_styles = Column(Text, nullable=True)  # ✅ AGREGAR (JSON como TEXT)
+    is_verified = Column(Boolean, default=False)  # ✅ AGREGAR
     is_active = Column(Boolean, default=True)
+    role = Column(String(20), default="user")  # ✅ AGREGAR
+    email_verified_at = Column(DateTime, nullable=True)  # ✅ AGREGAR
+    login_attempts = Column(Integer, default=0)  # ✅ AGREGAR
+    locked_until = Column(DateTime, nullable=True)  # ✅ AGREGAR
+    password_reset_token = Column(String(255), nullable=True)  # ✅ AGREGAR
+    password_reset_token_expiry = Column(DateTime, nullable=True)  # ✅ AGREGAR
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    last_login = Column(DateTime, nullable=True)  # ✅ AGREGAR
     
     # Relaciones
     pins = relationship("Pin", back_populates="user", cascade="all, delete-orphan")

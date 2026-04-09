@@ -11,7 +11,7 @@ from sqlalchemy import func, or_
 
 from internal.users.domain.entities.user import User
 from internal.users.domain.repositories.user_repository import UserRepository
-from internal.users.infrastructure.database.user_model import User
+from internal.users.infrastructure.database.user_model import User as UserModel
 
 
 class MySQLUserRepository(UserRepository):
@@ -41,35 +41,35 @@ class MySQLUserRepository(UserRepository):
             return json.dumps(value)
         return None
 
-    def _to_entity(self, model: User) -> User:
+    def _to_entity(self, model: UserModel) -> User:  # ✅ Cambiar User a UserModel aquí
         return User(
             id=model.id,
             username=model.username,
             email=model.email,
-            password_hash=model.password_hash,
-            full_name=model.full_name,
+            password_hash=model.password_hash,  # ✅ Usar password_hash del modelo
+            full_name=model.full_name,  # ← Modelo no tiene full_name
             bio=model.bio,
-            avatar_url=model.avatar_url,
-            gender=model.gender or "prefer_not_to_say",
+            avatar_url=model.avatar_url,  # ✅ Usar avatar_url del modelo
+            gender=model.gender,
             preferred_styles=self._parse_json_list(model.preferred_styles),
-            is_verified=model.is_verified or False,
+            is_verified=model.is_verified,
             is_active=model.is_active if model.is_active is not None else True,
-            role=model.role or "user",
+            role=model.role,
             email_verified_at=model.email_verified_at,
-            login_attempts=model.login_attempts or 0,
+            login_attempts=model.login_attempts,
             locked_until=model.locked_until,
             password_reset_token=model.password_reset_token,
             password_reset_token_expiry=model.password_reset_token_expiry,
             created_at=model.created_at,
             updated_at=model.updated_at,
-            last_login=model.last_login,
+            last_login=None,
         )
 
     # ── CRUD ──────────────────────────────────────────────────
 
     async def create(self, user: User) -> User:
         now = datetime.now(timezone.utc)
-        model = User(
+        model = UserModel(
             id=str(uuid.uuid4()),
             username=user.username,
             email=user.email,
@@ -97,37 +97,37 @@ class MySQLUserRepository(UserRepository):
         return self._to_entity(model)
 
     async def get_by_id(self, user_id: str) -> Optional[User]:
-        model = self._db.query(User).filter(
-            User.id == user_id,
+        model = self._db.query(UserModel).filter(
+            UserModel.id == user_id,
         ).first()
         return self._to_entity(model) if model else None
 
     async def get_by_email(self, email: str) -> Optional[User]:
-        model = self._db.query(User).filter(
-            User.email == email,
+        model = self._db.query(UserModel).filter(
+            UserModel.email == email,
         ).first()
         return self._to_entity(model) if model else None
 
     async def get_by_username(self, username: str) -> Optional[User]:
-        model = self._db.query(User).filter(
-            User.username == username,
+        model = self._db.query(UserModel).filter(
+            UserModel.username == username,
         ).first()
         return self._to_entity(model) if model else None
 
     async def get_by_identity(self, identity: str) -> Optional[User]:
         """Busca por email o username"""
         identity_lower = identity.lower().strip()
-        model = self._db.query(User).filter(
+        model = self._db.query(UserModel).filter(
             or_(
-                User.email == identity_lower,
-                User.username == identity_lower,
+                UserModel.email == identity_lower,
+                UserModel.username == identity_lower,
             )
         ).first()
         return self._to_entity(model) if model else None
 
     async def update(self, user: User) -> User:
-        model = self._db.query(User).filter(
-            User.id == user.id
+        model = self._db.query(UserModel).filter(
+            UserModel.id == user.id
         ).first()
         if model:
             model.full_name = user.full_name
@@ -145,8 +145,8 @@ class MySQLUserRepository(UserRepository):
 
     async def delete(self, user_id: str) -> bool:
         """Soft delete - desactiva la cuenta"""
-        model = self._db.query(User).filter(
-            User.id == user_id
+        model = self._db.query(UserModel).filter(
+            UserModel.id == user_id
         ).first()
         if model:
             model.is_active = False
@@ -159,16 +159,16 @@ class MySQLUserRepository(UserRepository):
 
     async def exists_by_email(self, email: str) -> bool:
         count = (
-            self._db.query(func.count(User.id))
-            .filter(User.email == email)
+            self._db.query(func.count(UserModel.id))
+            .filter(UserModel.email == email)
             .scalar()
         )
         return (count or 0) > 0
 
     async def exists_by_username(self, username: str) -> bool:
         count = (
-            self._db.query(func.count(User.id))
-            .filter(User.username == username)
+            self._db.query(func.count(UserModel.id))
+            .filter(UserModel.username == username)
             .scalar()
         )
         return (count or 0) > 0
@@ -176,10 +176,10 @@ class MySQLUserRepository(UserRepository):
     # ── Seguridad / Login ─────────────────────────────────────
 
     async def update_last_login(self, user_id: str) -> None:
-        self._db.query(User).filter(
-            User.id == user_id
+        self._db.query(UserModel).filter(
+            UserModel.id == user_id
         ).update({
-            User.last_login: datetime.now(timezone.utc),
+            UserModel.last_login: datetime.now(timezone.utc),
         })
         self._db.commit()
 
@@ -189,36 +189,36 @@ class MySQLUserRepository(UserRepository):
         attempts: int,
         locked_until: Optional[datetime],
     ) -> None:
-        self._db.query(User).filter(
-            User.id == user_id
+        self._db.query(UserModel).filter(
+            UserModel.id == user_id
         ).update({
-            User.login_attempts: attempts,
-            User.locked_until: locked_until,
+            UserModel.login_attempts: attempts,
+            UserModel.locked_until: locked_until,
         })
         self._db.commit()
 
     async def increment_login_attempts(self, user_id: str) -> None:
-        self._db.query(User).filter(
-            User.id == user_id
+        self._db.query(UserModel).filter(
+            UserModel.id == user_id
         ).update({
-            User.login_attempts: User.login_attempts + 1,
+            UserModel.login_attempts: UserModel.login_attempts + 1,
         })
         self._db.commit()
 
     async def reset_login_attempts(self, user_id: str) -> None:
-        self._db.query(User).filter(
-            User.id == user_id
+        self._db.query(UserModel).filter(
+            UserModel.id == user_id
         ).update({
-            User.login_attempts: 0,
-            User.locked_until: None,
+            UserModel.login_attempts: 0,
+            UserModel.locked_until: None,
         })
         self._db.commit()
 
     async def lock_account(self, user_id: str, until: datetime) -> None:
-        self._db.query(User).filter(
-            User.id == user_id
+        self._db.query(UserModel).filter(
+            UserModel.id == user_id
         ).update({
-            User.locked_until: until,
+            UserModel.locked_until: until,
         })
         self._db.commit()
 
@@ -232,15 +232,15 @@ class MySQLUserRepository(UserRepository):
     ) -> List[User]:
         search_term = f"%{query}%"
         models = (
-            self._db.query(User)
+            self._db.query(UserModel)
             .filter(
-                User.is_active == True,
+                UserModel.is_active == True,
                 or_(
-                    User.username.ilike(search_term),
-                    User.full_name.ilike(search_term),
+                    UserModel.username.ilike(search_term),
+                    UserModel.full_name.ilike(search_term),
                 )
             )
-            .order_by(User.created_at.desc())
+            .order_by(UserModel.created_at.desc())
             .offset(offset)
             .limit(limit)
             .all()
