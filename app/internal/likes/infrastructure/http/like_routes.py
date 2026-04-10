@@ -16,6 +16,24 @@ from internal.users.infrastructure.middlewares.auth_middleware import get_curren
 router = APIRouter(prefix="/likes", tags=["Likes"])
 
 
+# ✅ POST /likes — alias directo de /likes/toggle para la app móvil
+@router.post(
+    "",
+    response_model=LikeStatusResponse,
+    summary="Toggle like a un pin (alias de /toggle)",
+)
+async def toggle_like_root(
+    body: LikePinRequest,
+    user_id: str = Depends(get_current_user_id),
+    controller: LikeController = Depends(get_like_controller),
+):
+    try:
+        return await controller.toggle_like(body, user_id)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
+
+# POST /likes/toggle
 @router.post(
     "/toggle",
     response_model=LikeStatusResponse,
@@ -29,10 +47,7 @@ async def toggle_like(
     try:
         return await controller.toggle_like(body, user_id)
     except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
 
 
 @router.post(
@@ -48,10 +63,7 @@ async def like_pin(
     try:
         return await controller.like_pin(body, user_id)
     except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
 
 
 @router.delete(
@@ -67,10 +79,7 @@ async def unlike_pin(
     try:
         return await controller.unlike_pin(pin_id, user_id)
     except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
 
 
 @router.get(
@@ -87,10 +96,7 @@ async def get_pin_likes(
     try:
         return await controller.get_pin_likes(pin_id, limit, offset)
     except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
 
 
 @router.get(
@@ -107,26 +113,20 @@ async def get_user_likes(
     try:
         return await controller.get_user_likes(user_id, limit, offset)
     except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
 
 
 @router.get(
-    "/{user_id}/{pin_id}",
+    "/status/{pin_id}",
     response_model=LikeStatusResponse,
-    summary="Verificar estado de like",
+    summary="Verificar estado de like del usuario autenticado",
 )
 async def check_like_status(
-    user_id: str,
     pin_id: str,
+    user_id: str = Depends(get_current_user_id),
     controller: LikeController = Depends(get_like_controller),
 ):
     try:
         return await controller.check_like_status(user_id, pin_id)
     except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
