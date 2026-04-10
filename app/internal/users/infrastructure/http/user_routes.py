@@ -2,6 +2,7 @@
 Rutas HTTP de Users
 """
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel
 from typing import Annotated, Optional
 
 from internal.users.domain.entities.user import UserMe
@@ -19,6 +20,12 @@ from internal.users.infrastructure.middlewares.auth_middleware import get_curren
 
 
 router = APIRouter(prefix="/users", tags=["Users"])
+
+
+# ✅ AGREGAR MODELO PARA FCM TOKEN
+class SaveFCMTokenRequest(BaseModel):
+    token: str
+    device_name: Optional[str] = None
 
 
 # ====================== MI PERFIL (protegido) ======================
@@ -137,21 +144,48 @@ async def search_users(
 
 # ====================== FCM TOKEN ======================
 
-
+# ✅ CORREGIR: Usar modelo Pydantic en Body
 @router.post(
     "/fcm-token",
     summary="Guardar token FCM para notificaciones push",
 )
 async def save_fcm_token(
-    token: str,
-    device_name: Optional[str] = None,  # ✅ AGREGAR
+    body: SaveFCMTokenRequest,  # ✅ CAMBIAR: Recibir como JSON Body
     user_id: str = Depends(get_current_user_id),
     controller: UserController = Depends(get_user_controller),
 ):
-    result = await controller.save_fcm_token(user_id, token, device_name)
-    return result  # ✅ Retornar respuesta completa del use case
+    """Guardar token FCM del dispositivo"""
+    try:
+        if not body.token:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Token es requerido"
+            )
+        
+        result = await controller.save_fcm_token(
+            user_id, 
+            body.token, 
+            body.device_name
+        )
+        
+        return {
+            "status": "success",
+            "message": "✅ Token FCM guardado correctamente",
+            "data": result
+        }
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error: {str(e)}"
+        )
 
-# ====================== TEST NOTIFICATION (🔥 ANTES DE /{user_id}) ======================
+
+# ====================== TEST NOTIFICATION ======================
 
 @router.get(
     "/test-notification",
@@ -161,44 +195,61 @@ async def test_notification(
     user_id: str = Depends(get_current_user_id),
     controller: UserController = Depends(get_user_controller),
 ):
-    print("USER_ID DEL TOKEN:", user_id)
+    """Enviar notificación de prueba al usuario autenticado"""
+    print(f"📱 TEST NOTIFICATION para user_id: {user_id}")
 
-    # 🔍 Obtener usuario real desde DB
-    user = await controller._get_user_uc.execute_by_id(user_id)
-
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Usuario no encontrado en DB"
-        )
-
-    if not user.fcm_token:
-        return {
-            "error": "El usuario no tiene FCM token",
-            "user_id": user_id
-        }
-
-    # 🔔 Enviar notificación
     try:
-        from core.notifications import send_push
+        # 🔍 Obtener usuario real desde DB
+        user = await controller._get_user_uc.execute_by_id(user_id)
 
-        result = await send_push(
-            token=user.fcm_token,
-            title="PRUEBA 🔥",
-            body="Si ves esto, Firebase funciona correctamente"
-        )
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Usuario no encontrado en DB"
+            )
 
-        print("RESULTADO FIREBASE:", result)
+        # 🔔 Obtener FCM token desde repository
+        fcm_token = await controller._get_user_uc._user_repo.get_fcm_token(user_id)
+        
+        if not fcm_token:
+            return {
+                "error": "El usuario no tiene FCM token registrado",
+                "user_id": user_id,
+                "help": "Primero guardar FCM token en POST /api/v1/users/fcm-token"
+            }
 
-        return {
-            "message": "Notificación enviada",
-            "firebase_response": result,
-            "user_id": user_id
-        }
+        # 🔔 Enviar notificación a Firebase
+        try:
+            from app.core.notifications import send_push
+
+            result = await send_push(
+                token=fcm_token,
+                title="🔥 PRUEBA StylePin",
+                body="Si ves esto, ¡Firebase funciona correctamente!"
+            )
+
+            print(f"✅ RESULTADO FIREBASE: {result}")
+
+            return {
+                "status": "success",
+                "message": "✅ Notificación enviada correctamente",
+                "firebase_response": result,
+                "user_id": user_id
+            }
+        except Exception as firebase_error:
+            print(f"❌ Error Firebase: {firebase_error}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Error al enviar notificación: {str(firebase_error)}"
+            )
+    
+    except HTTPException:
+        raise
     except Exception as e:
+        print(f"❌ Error general: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error al enviar notificación: {str(e)}"
+            detail=f"Error: {str(e)}"
         )
 
 

@@ -2,104 +2,58 @@
 Rutas HTTP de Notificaciones
 """
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
 
-from core.connection import get_db
-from internal.notifications.application.schemas.notification_schema import RegisterFCMTokenRequest
-from internal.notifications.infrastructure.http.notification_controller import NotificationController
-from internal.notifications.infrastructure.http.dependencies import get_notification_controller
-from internal.notifications.application.use_cases.send_notification import SendNotificationUseCase
-from internal.notifications.application.schemas.notification_schema import NotificationType
-
+from internal.notifications.infrastructure.http.dependencies import (
+    get_notification_controller
+)
+from internal.users.infrastructure.middlewares.auth_middleware import get_current_user_id
 
 router = APIRouter(prefix="/notifications", tags=["Notifications"])
 
 
-@router.post(
-    "/register-fcm-token",
-    status_code=status.HTTP_201_CREATED,
-    summary="Registrar token FCM del dispositivo",
-)
-async def register_fcm_token(
-    body: RegisterFCMTokenRequest,
-    db: Session = Depends(get_db),
-    controller: NotificationController = Depends(get_notification_controller),
-):
-    try:
-        return await controller.register_fcm_token(body, db)
-    except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e),
-        )
-
-
-# ✅ NUEVO: Endpoint de PRUEBA para enviar notificación
-@router.post(
-    "/test-send",
-    summary="PRUEBA: Enviar notificación de prueba",
-    tags=["Testing"],
-)
-async def test_send_notification(
-    user_id: str,
-    actor_id: str = "admin",
-    db: Session = Depends(get_db),
-):
-    """
-    ⚠️ SOLO PARA DESARROLLO - Envía una notificación de prueba
-    
-    Parámetros:
-    - user_id: ID del usuario que recibe la notificación
-    - actor_id: ID del usuario que realiza la acción (por defecto "admin")
-    """
-    try:
-        use_case = SendNotificationUseCase(db)
-        result = use_case.execute(
-            user_id=user_id,
-            actor_id=actor_id,
-            notification_type=NotificationType.LIKE,
-            title="🧪 Notificación de Prueba",
-            body="Esta es una notificación de prueba del sistema FCM",
-            pin_id="test_pin_123"
-        )
-        return result
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e),
-        )
-
-
 @router.get(
     "/",
-    summary="Obtener todas las notificaciones del usuario",
+    summary="Obtener notificaciones del usuario",
 )
 async def get_notifications(
-    db: Session = Depends(get_db),
+    limit: int = 50,
+    offset: int = 0,
+    user_id: str = Depends(get_current_user_id),
+    controller = Depends(get_notification_controller),
 ):
+    """Obtener notificaciones del usuario autenticado"""
     try:
-        # TODO: Implementar obtención de notificaciones
-        return []
+        result = await controller.get_notifications(user_id, limit, offset)
+        return {
+            "status": "success",
+            "data": result
+        }
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e),
+            detail=str(e)
         )
 
 
-@router.put(
+@router.post(
     "/{notification_id}/read",
     summary="Marcar notificación como leída",
 )
-async def mark_notification_as_read(
+async def mark_as_read(
     notification_id: str,
-    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+    controller = Depends(get_notification_controller),
 ):
+    """Marcar una notificación como leída"""
     try:
-        # TODO: Implementar marcar como leído
-        return {"message": "Notification marked as read"}
+        result = await controller.mark_as_read(notification_id, user_id)
+        return {
+            "status": "success",
+            "message": "Notificación marcada como leída",
+            "data": result
+        }
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
+            detail=str(e)
         )

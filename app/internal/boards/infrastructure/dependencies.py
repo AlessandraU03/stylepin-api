@@ -36,7 +36,7 @@ def get_board_controller(db: Session = Depends(get_db)) -> BoardController:
         add_pin_uc=AddPinToBoardUseCase(board_repo),
         remove_pin_uc=RemovePinFromBoardUseCase(board_repo),
         get_pins_uc=GetBoardPinsUseCase(board_repo),
-        add_collab_uc=AddCollaboratorUseCase(board_repo),
+        add_collab_uc=AddCollaboratorUseCase(board_repo, user_repo),  # ✅ PASAR AMBOS REPOS
         remove_collab_uc=RemoveCollaboratorUseCase(board_repo),
         update_collab_uc=UpdateCollaboratorUseCase(board_repo),
     )
