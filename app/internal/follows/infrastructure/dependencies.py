@@ -14,12 +14,16 @@ from internal.follows.application.use_cases.get_following import GetFollowingUse
 from internal.follows.application.use_cases.check_follow_status import CheckFollowStatusUseCase
 from internal.follows.application.use_cases.get_follow_counts import GetFollowCountsUseCase
 
+# ← AGREGAR este import
+from internal.users.infrastructure.adapters.mysql_user_repository import MySQLUserRepository
+
 
 def get_follow_controller(db: Session = Depends(get_db)) -> FollowController:
-    repo = MySQLFollowRepository(db)
+    repo      = MySQLFollowRepository(db)
+    user_repo = MySQLUserRepository(db)   # ← NUEVO
 
     return FollowController(
-        follow_uc=FollowUserUseCase(repo),
+        follow_uc=FollowUserUseCase(repo, user_repo),  # ← 2 args
         unfollow_uc=UnfollowUserUseCase(repo),
         get_followers_uc=GetFollowersUseCase(repo),
         get_following_uc=GetFollowingUseCase(repo),

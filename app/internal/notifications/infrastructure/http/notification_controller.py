@@ -5,8 +5,8 @@ import logging
 from datetime import datetime
 
 from internal.notifications.domain.entities.notification import Notification
-from internal.notifications.application.use_cases.get_notifications import GetNotificationsUseCase
-from internal.notifications.application.use_cases.mark_notification_as_read import MarkNotificationAsReadUseCase
+from internal.notifications.application.use_cases.get_notification import GetNotificationsUseCase
+from internal.notifications.application.use_cases.mark_notification_read import MarkNotificationAsReadUseCase
 from internal.notifications.application.use_cases.create_notification import CreateNotificationUseCase
 
 logger = logging.getLogger(__name__)

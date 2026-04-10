@@ -14,12 +14,18 @@ from internal.comments.application.use_cases.update_comment import UpdateComment
 from internal.comments.application.use_cases.delete_comment import DeleteCommentUseCase
 from internal.comments.application.use_cases.like_comment import LikeCommentUseCase
 
+# ← AGREGAR estos dos imports
+from internal.users.infrastructure.adapters.mysql_user_repository import MySQLUserRepository
+from internal.pines.infrastructure.adapters.mysql_pin_repository import MySQLPinRepository
+
 
 def get_comment_controller(db: Session = Depends(get_db)) -> CommentController:
-    repo = MySQLCommentRepository(db)
+    repo       = MySQLCommentRepository(db)
+    user_repo  = MySQLUserRepository(db)   # ← NUEVO
+    pin_repo   = MySQLPinRepository(db)    # ← NUEVO
 
     return CommentController(
-        create_uc=CreateCommentUseCase(repo),
+        create_uc=CreateCommentUseCase(repo, user_repo, pin_repo),  # ← 3 args
         get_by_pin_uc=GetCommentsByPinUseCase(repo),
         get_replies_uc=GetRepliesUseCase(repo),
         update_uc=UpdateCommentUseCase(repo),
