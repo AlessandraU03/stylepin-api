@@ -11,6 +11,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 class CreateCommentUseCase:
     def __init__(
         self,
@@ -26,11 +27,9 @@ class CreateCommentUseCase:
         self,
         user_id: str,
         pin_id: str,
-        content: str
+        text: str,                          # ← era "content", corregido a "text"
+        parent_comment_id: str = None
     ) -> Comment:
-        """
-        Ejecutar el caso de uso de crear comentario
-        """
         # Validar que el pin existe
         pin = await self._pin_repo.get_by_id(pin_id)
         if not pin:
@@ -47,31 +46,27 @@ class CreateCommentUseCase:
             id="",
             pin_id=pin_id,
             user_id=user_id,
-            content=content,
+            text=text,                      # ← era "content"
+            parent_comment_id=parent_comment_id,
+            likes_count=0,
             created_at=now,
+            updated_at=now,
         )
 
         created = await self._repo.create(comment)
 
         # 🔔 Notificar al dueño del pin si no es el mismo usuario
         if pin.user_id != user_id:
-            pin_owner = await self._user_repo.get_by_id(pin.user_id)
-            
-            if pin_owner:
-                # ✅ OBTENER token FCM usando el repositorio
-                fcm_token = await self._user_repo.get_fcm_token(pin.user_id)
-                
-                if fcm_token:
-                    try:
-                        await notify_new_comment(
-                            token=fcm_token,
-                            username=commenter.username,
-                            comment=content[:100]
-                        )
-                        logger.info(f"✅ Notificación de comentario enviada a {pin_owner.username}")
-                    except Exception as e:
-                        logger.error(f"❌ Error enviando notificación de comentario: {e}")
-                else:
-                    logger.warning(f"⚠️ No FCM token found for user {pin.user_id}")
+            fcm_token = await self._user_repo.get_fcm_token(pin.user_id)
+            if fcm_token:
+                try:
+                    await notify_new_comment(
+                        token=fcm_token,        # ← firma correcta: token, username, comment
+                        username=commenter.username,
+                        comment=text[:100]
+                    )
+                    logger.info(f"✅ Notificación de comentario enviada")
+                except Exception as e:
+                    logger.error(f"❌ Error enviando notificación de comentario: {e}")
 
         return created

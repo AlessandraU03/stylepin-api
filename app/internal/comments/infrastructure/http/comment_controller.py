@@ -18,7 +18,6 @@ from internal.comments.application.schemas.comment_schemas import (
     RepliesListResponse,
     MessageResponse,
 )
-from core.notifications import notify_new_comment
 
 logger = logging.getLogger(__name__)
 
@@ -34,13 +33,13 @@ class CommentController:
         like_uc: LikeCommentUseCase,
         db_session=None,
     ):
-        self._create_uc = create_uc
+        self._create_uc     = create_uc
         self._get_by_pin_uc = get_by_pin_uc
         self._get_replies_uc = get_replies_uc
-        self._update_uc = update_uc
-        self._delete_uc = delete_uc
-        self._like_uc = like_uc
-        self._db = db_session
+        self._update_uc     = update_uc
+        self._delete_uc     = delete_uc
+        self._like_uc       = like_uc
+        self._db            = db_session
 
     @staticmethod
     def _to_response(
@@ -71,41 +70,14 @@ class CommentController:
     async def create_comment(
         self, body: CreateCommentRequest, user_id: str
     ) -> CommentResponse:
+        # El use case ya maneja la notificación internamente
         comment = await self._create_uc.execute(
             pin_id=body.pin_id,
             user_id=user_id,
-            text=body.text,
+            text=body.text,                          # ← campo correcto
             parent_comment_id=body.parent_comment_id,
         )
-
-        try:
-            await self._send_comment_notification(user_id, body.pin_id, body.text)
-        except Exception as e:
-            logger.warning(f"No se pudo enviar notificacion de comment: {e}")
-
         return self._to_response(comment, current_user_id=user_id)
-
-    async def _send_comment_notification(self, commenter_id: str, pin_id: str, text: str):
-        if not self._db:
-            return
-
-        from core.database.models import Pin, User
-
-        pin = self._db.query(Pin).filter(Pin.id == pin_id).first()
-        if not pin or pin.user_id == commenter_id:
-            return
-
-        commenter = self._db.query(User).filter(User.id == commenter_id).first()
-        commenter_username = commenter.username if commenter else "alguien"
-
-        await notify_new_comment(
-            pin_owner_id=pin.user_id,
-            commenter_username=commenter_username,
-            pin_id=pin_id,
-            pin_title=pin.title or "tu pin",
-            comment_text=text,
-        )
-        logger.info(f"Comment: {commenter_username} -> pin '{pin.title}' de {pin.user_id}")
 
     async def get_comments_by_pin(
         self, pin_id: str, current_user_id: str = None, limit: int = 50, offset: int = 0
@@ -153,10 +125,10 @@ class CommentController:
         await self._delete_uc.execute(comment_id=comment_id, user_id=user_id)
         return MessageResponse(message="Comentario eliminado correctamente")
 
-    async def like_comment(self, comment_id: str) -> MessageResponse:
+    async def like_comment(self, comment_id: str, user_id: str = None) -> MessageResponse:
         await self._like_uc.like(comment_id)
         return MessageResponse(message="Like agregado")
 
-    async def unlike_comment(self, comment_id: str) -> MessageResponse:
+    async def unlike_comment(self, comment_id: str, user_id: str = None) -> MessageResponse:
         await self._like_uc.unlike(comment_id)
         return MessageResponse(message="Like removido")
