@@ -1,10 +1,8 @@
 """
 Controlador HTTP de Users
 """
-import token
+import logging
 from typing import Optional
-from unittest import result
-
 from passlib.context import CryptContext
 
 from app.internal.users.application.use_cases.save_fcm_token import SaveFcmTokenUseCase
@@ -24,7 +22,7 @@ from internal.users.application.schemas.user_schema import (
     MessageResponse,
 )
 
-
+logger = logging.getLogger(__name__)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
@@ -42,7 +40,6 @@ class UserController:
         self._delete_user_uc = delete_user_uc
         self._search_users_uc = search_users_uc
         self._save_fcm_token_uc = save_fcm_token_uc
-
 
     # ── Mapeo ─────────────────────────────────────────────────
 
@@ -139,8 +136,8 @@ class UserController:
 
         return UserProfileResponse(
             user=self._to_profile(user, stats),
-            is_following=False,     # TODO: verificar con follow repo
-            is_followed_by=False,   # TODO: verificar con follow repo
+            is_following=False,
+            is_followed_by=False,
         )
 
     async def get_user_by_id(self, user_id: str) -> UserProfileResponse:
@@ -172,10 +169,41 @@ class UserController:
             offset=result["offset"],
             has_more=result["has_more"],
         )
-    
-# ...existing code...
 
-    async def save_fcm_token(self, user_id: str, token: str, device_name: Optional[str] = None) -> dict:
-        """Guardar token FCM"""
-        result = await self._save_fcm_token_uc.execute(user_id, token, device_name)
-        return result  # ✅ Retornar toda la respuesta
+    # ── FCM Token ──────────────────────────────────────────────
+
+    async def save_fcm_token(
+        self,
+        user_id: str,
+        token: str,
+        device_name: Optional[str] = None
+    ) -> dict:
+        """
+        Guardar token FCM del usuario
+        
+        Returns:
+            {
+                "status": "success",
+                "message": "Token FCM guardado",
+                "user_id": "...",
+                "device_name": "..."
+            }
+        """
+        try:
+            result = await self._save_fcm_token_uc.execute(
+                user_id=user_id,
+                token=token,
+                device_name=device_name
+            )
+            
+            logger.info(f"✅ FCM Token saved for user {user_id}")
+            
+            return {
+                "status": "success",
+                "message": "Token FCM guardado correctamente",
+                "user_id": user_id,
+                "device_name": device_name or "Unknown Device"
+            }
+        except Exception as e:
+            logger.error(f"❌ Error saving FCM token: {e}")
+            raise ValueError(f"Error al guardar FCM token: {str(e)}")

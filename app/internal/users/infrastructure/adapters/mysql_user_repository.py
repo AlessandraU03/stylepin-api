@@ -9,6 +9,7 @@ import json
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_
 
+from app.core.database.models import FCMToken
 from internal.users.domain.entities.user import User
 from internal.users.domain.repositories.user_repository import UserRepository
 from internal.users.infrastructure.database.user_model import User as UserModel
@@ -299,3 +300,26 @@ class MySQLUserRepository(UserRepository):
             pass
 
         return stats
+    
+
+    async def get_fcm_token(self, user_id: str) -> Optional[str]:
+        """
+        Obtiene el token FCM activo más reciente del usuario.
+        
+        Prioridad:
+        1. Token activo más reciente
+        2. Si no hay activo, retorna None
+        """
+        from core.database.models import FCMToken
+        
+        fcm_record = self._db.query(FCMToken).filter(
+            FCMToken.user_id == user_id,
+            FCMToken.is_active == True
+        ).order_by(
+            FCMToken.created_at.desc()
+        ).first()
+        
+        if fcm_record:
+            return fcm_record.device_token
+        
+        return None

@@ -4,11 +4,11 @@ Controlador HTTP de Likes
 import logging
 
 from app.internal.likes.application.use_cases.toggle_like import ToggleLikeUseCase
-from internal.likes.application.use_cases.like_pin import LikePinUseCase
-from internal.likes.application.use_cases.unlike_pin import UnlikePinUseCase
-from internal.likes.application.use_cases.get_pin_likes import GetPinLikesUseCase
-from internal.likes.application.use_cases.get_user_likes import GetUserLikesUseCase
-from internal.likes.application.use_cases.check_like_status import CheckLikeStatusUseCase
+from app.internal.likes.application.use_cases.like_pin import LikePinUseCase
+from app.internal.likes.application.use_cases.unlike_pin import UnlikePinUseCase
+from app.internal.likes.application.use_cases.get_pin_likes import GetPinLikesUseCase
+from app.internal.likes.application.use_cases.get_user_likes import GetUserLikesUseCase
+from app.internal.likes.application.use_cases.check_like_status import CheckLikeStatusUseCase
 
 from internal.likes.domain.entities.like import Like, LikeResponse
 from internal.likes.application.schemas.like_schemas import (
@@ -18,7 +18,7 @@ from internal.likes.application.schemas.like_schemas import (
     UserLikesListResponse,
     MessageResponse,
 )
-from core.notifications import notify_new_like
+from app.core.notifications import notify_new_like
 
 logger = logging.getLogger(__name__)
 
@@ -121,10 +121,8 @@ class LikeController:
         liker_username = liker.username if liker else "alguien"
 
         await notify_new_like(
-            pin_owner_id=pin.user_id,
-            liker_username=liker_username,
-            pin_id=pin_id,
-            pin_title=pin.title or "tu pin",
+            token=pin.user_fcm_token,  # ✅ CAMBIAR: usar get_fcm_token del repo en el UseCase
+            username=liker_username,
         )
         logger.info(f"🔔 Notificación de like enviada a {pin.user_id}")
 

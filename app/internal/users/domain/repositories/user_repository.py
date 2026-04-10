@@ -101,4 +101,17 @@ class UserRepository(ABC):
         }
         """
         pass
+
+    @abstractmethod
+    async def get_fcm_token(self, user_id: str) -> Optional[str]:
+        """
+        Obtiene el token FCM activo más reciente de un usuario.
+        
+        Args:
+            user_id: ID del usuario
+            
+        Returns:
+            El device token si existe, None en caso contrario
+        """
+        pass
     

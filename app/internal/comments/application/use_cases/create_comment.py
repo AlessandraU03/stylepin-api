@@ -1,43 +1,77 @@
 """
-Caso de uso: Crear un comentario
+Caso de uso: Crear comentario
 """
+from datetime import datetime, timezone
+from app.core.notifications import notify_new_comment
 from internal.comments.domain.entities.comment import Comment
 from internal.comments.domain.repositories.comment_repository import CommentRepository
+from internal.users.domain.repositories.user_repository import UserRepository
+from internal.pines.domain.repositories.pin_repository import PinRepository
+import logging
 
+logger = logging.getLogger(__name__)
 
 class CreateCommentUseCase:
-    def __init__(self, comment_repository: CommentRepository):
+    def __init__(
+        self,
+        comment_repository: CommentRepository,
+        user_repository: UserRepository,
+        pin_repository: PinRepository
+    ):
         self._repo = comment_repository
+        self._user_repo = user_repository
+        self._pin_repo = pin_repository
 
     async def execute(
         self,
-        pin_id: str,
         user_id: str,
-        text: str,
-        parent_comment_id: str = None
+        pin_id: str,
+        content: str
     ) -> Comment:
-        # Si es respuesta, verificar que el padre existe
-        if parent_comment_id:
-            parent = await self._repo.get_by_id(parent_comment_id)
-            if not parent:
-                raise ValueError("El comentario padre no existe")
-            # Solo un nivel de anidamiento
-            if parent.parent_comment_id is not None:
-                raise ValueError("No se puede responder a una respuesta")
+        """
+        Ejecutar el caso de uso de crear comentario
+        """
+        # Validar que el pin existe
+        pin = await self._pin_repo.get_by_id(pin_id)
+        if not pin:
+            raise ValueError("Pin no encontrado")
 
-        from datetime import datetime, timezone
+        # Validar que el usuario existe
+        commenter = await self._user_repo.get_by_id(user_id)
+        if not commenter:
+            raise ValueError("Usuario no encontrado")
+
+        # Crear comentario
         now = datetime.now(timezone.utc)
-
         comment = Comment(
-            id="",  # se asignará en el repo
+            id="",
             pin_id=pin_id,
             user_id=user_id,
-            text=text,
-            parent_comment_id=parent_comment_id,
-            likes_count=0,
+            content=content,
             created_at=now,
-            updated_at=now,
         )
 
         created = await self._repo.create(comment)
+
+        # 🔔 Notificar al dueño del pin si no es el mismo usuario
+        if pin.user_id != user_id:
+            pin_owner = await self._user_repo.get_by_id(pin.user_id)
+            
+            if pin_owner:
+                # ✅ OBTENER token FCM usando el repositorio
+                fcm_token = await self._user_repo.get_fcm_token(pin.user_id)
+                
+                if fcm_token:
+                    try:
+                        await notify_new_comment(
+                            token=fcm_token,
+                            username=commenter.username,
+                            comment=content[:100]
+                        )
+                        logger.info(f"✅ Notificación de comentario enviada a {pin_owner.username}")
+                    except Exception as e:
+                        logger.error(f"❌ Error enviando notificación de comentario: {e}")
+                else:
+                    logger.warning(f"⚠️ No FCM token found for user {pin.user_id}")
+
         return created

@@ -33,10 +33,11 @@ def get_auth_controller(db: Session = Depends(get_db)) -> AuthController:
 def get_user_controller(db: Session = Depends(get_db)) -> UserController:
     repo = MySQLUserRepository(db)
 
+    # ✅ CORRECCIÓN: Pasar repo Y db
     return UserController(
         get_user_uc=GetUserUseCase(repo),
         update_user_uc=UpdateUserUseCase(repo),
         delete_user_uc=DeleteUserUseCase(repo),
         search_users_uc=SearchUsersUseCase(repo),
-        save_fcm_token_uc=SaveFcmTokenUseCase(db),  # ✅ CAMBIAR: pasar db, NO repo
+        save_fcm_token_uc=SaveFcmTokenUseCase(repo, db),  # ✅ PASAR AMBOS
     )
