@@ -1,20 +1,21 @@
 """
 Rutas HTTP de Notificaciones - CORREGIDO
 
-Problema: GET /api/v1/notifications devolvía un dict:
-  {"notifications": [...], "total": 0, "limit": 50, ...}
+PROBLEMA: GET /api/v1/notifications devolvía un dict:
+  {"notifications": [...], "total": N, "limit": 50, ...}
 
-Pero el cliente Android espera directamente una List:
-  Response<List<NotificationResponse>>
-  y llama a response.body()?.map { it.toDomain() }
+El cliente Android usa Response<List<NotificationResponse>> y llama:
+  response.body()?.map { it.toDomain() }
 
-Si recibe un dict en vez de una lista, Gson falla y lanza excepción
-→ el Android muestra "No se pudieron cargar las notificaciones".
+Gson no puede convertir un dict a List → body() devuelve null →
+el repositorio lanza la excepción y la pantalla muestra el error.
 
-CORRECCIÓN: el endpoint ahora devuelve directamente la lista de notificaciones.
+CORRECCIÓN: el endpoint devuelve directamente el array de notificaciones.
+Se usa result.get("notifications", []) sin construir objetos Pydantic
+manualmente (lo que causaba AttributeError en versiones anteriores).
+FastAPI serializa el array directamente como JSON.
 """
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from typing import List
 
 from internal.notifications.infrastructure.http.notification_controller import (
     NotificationController
@@ -22,7 +23,6 @@ from internal.notifications.infrastructure.http.notification_controller import (
 from internal.notifications.infrastructure.http.dependencies import (
     get_notification_controller
 )
-from internal.notifications.application.schemas.notification_schema import NotificationResponse
 from internal.users.infrastructure.middlewares.auth_middleware import get_current_user_id
 
 router = APIRouter(prefix="/notifications", tags=["Notifications"])
@@ -48,7 +48,9 @@ async def test_notification(
 
 @router.get(
     "",
-    response_model=List[NotificationResponse],  # ← CAMBIADO: lista directa, no dict
+    # SIN response_model: FastAPI serializa el resultado tal cual,
+    # evitando la conversión de modelos que causaba AttributeError.
+    # El Android recibe un array JSON en la raíz: [{...}, {...}, ...]
     summary="Obtener notificaciones del usuario",
 )
 async def get_notifications(
@@ -58,31 +60,35 @@ async def get_notifications(
     controller: NotificationController = Depends(get_notification_controller),
 ):
     """
-    Obtener notificaciones del usuario autenticado.
-    Devuelve directamente un array JSON para que el cliente Android
-    pueda hacer response.body()?.map { it.toDomain() } sin problemas.
+    Devuelve directamente un array JSON.
+
+    Estructura de cada elemento que el Android espera:
+    {
+        "id":         "...",
+        "title":      "...",
+        "body":       "...",
+        "type":       "like | follow | comment | board_collaboration",
+        "is_read":    false,
+        "created_at": "2026-04-12T...",
+        "read_at":    null
+    }
     """
     try:
         result = await controller.get_notifications(user_id, limit, offset)
-        # result es {"notifications": [...], "total": N, ...}
-        # Extraemos solo la lista para devolverla directamente
-        notifications = result.get("notifications", [])
 
-        # Convertimos cada entidad de dominio a NotificationResponse (schema Pydantic)
-        return [
-            NotificationResponse(
-                id=n.id,
-                title=n.title,
-                body=n.body,
-                type=n.type,
-                is_read=n.is_read,
-                created_at=n.created_at,
-                read_at=n.read_at,
-            )
-            for n in notifications
-        ]
+        # El controller devuelve {"notifications": [...], "total": N, ...}
+        # Extraemos solo la lista para que el Android pueda leerla directamente
+        if isinstance(result, dict):
+            return result.get("notifications", [])
+        if isinstance(result, list):
+            return result
+        return []
+
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al obtener notificaciones: {str(e)}"
+        )
 
 
 @router.put(
