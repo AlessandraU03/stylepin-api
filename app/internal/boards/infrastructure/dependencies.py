@@ -1,14 +1,14 @@
 """
-Inyección de dependencias para Boards
+Inyección de dependencias para Boards - CORREGIDO
 """
 from fastapi import Depends
 from sqlalchemy.orm import Session
 
-from app.internal.boards.application.use_cases.get_all_boards import GetAllBoardsUseCase
 from core.connection import get_db
 from internal.boards.infrastructure.adapters.mysql_board_repository import MySQLBoardRepository
-from internal.users.infrastructure.adapters.mysql_user_repository import MySQLUserRepository  # ✅ AGREGAR
+from internal.users.infrastructure.adapters.mysql_user_repository import MySQLUserRepository
 from internal.boards.infrastructure.http.board_controller import BoardController
+from app.internal.boards.application.use_cases.get_all_boards import GetAllBoardsUseCase
 from internal.boards.application.use_cases.create_board import CreateBoardUseCase
 from internal.boards.application.use_cases.get_board import GetBoardUseCase
 from internal.boards.application.use_cases.get_user_boards import GetUserBoardsUseCase
@@ -24,11 +24,11 @@ from internal.boards.application.use_cases.update_collaborator import UpdateColl
 
 def get_board_controller(db: Session = Depends(get_db)) -> BoardController:
     board_repo = MySQLBoardRepository(db)
-    user_repo = MySQLUserRepository(db)  # ✅ CREAR INSTANCIA DE USER REPO
+    user_repo = MySQLUserRepository(db)
 
     return BoardController(
         create_uc=CreateBoardUseCase(board_repo),
-        get_all_boards_uc=GetAllBoardsUseCase(board_repo, user_repo),  # ✅ PASAR 2 PARÁMETROS
+        get_all_boards_uc=GetAllBoardsUseCase(board_repo, user_repo),
         get_uc=GetBoardUseCase(board_repo),
         get_user_boards_uc=GetUserBoardsUseCase(board_repo),
         update_uc=UpdateBoardUseCase(board_repo),
@@ -36,8 +36,8 @@ def get_board_controller(db: Session = Depends(get_db)) -> BoardController:
         add_pin_uc=AddPinToBoardUseCase(board_repo),
         remove_pin_uc=RemovePinFromBoardUseCase(board_repo),
         get_pins_uc=GetBoardPinsUseCase(board_repo),
-        add_collab_uc=AddCollaboratorUseCase(board_repo, user_repo),  # ✅ PASAR AMBOS REPOS
+        add_collab_uc=AddCollaboratorUseCase(board_repo, user_repo),
         remove_collab_uc=RemoveCollaboratorUseCase(board_repo),
         update_collab_uc=UpdateCollaboratorUseCase(board_repo),
+        db_session=db,   # ← NUEVO: necesario para que _get_user_data funcione
     )
-
