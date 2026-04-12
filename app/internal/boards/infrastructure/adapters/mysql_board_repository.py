@@ -1,5 +1,10 @@
 """
 Implementación MySQL (SQLAlchemy) del repositorio de Boards (Adapter)
+
+CORRECCIÓN:
+- Renombramos los imports de los modelos SQLAlchemy para evitar el conflicto
+  de nombres con las entidades de dominio (ambas se llamaban Board, BoardPin, etc.)
+- cover_image_url se pasa de forma segura: solo si el modelo DB lo soporta
 """
 from typing import Optional, List
 from datetime import datetime, timezone
@@ -8,9 +13,20 @@ import uuid
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
-from internal.boards.domain.entities.board import Board, BoardPin, BoardCollaborator
+# Entidades de dominio
+from internal.boards.domain.entities.board import (
+    Board as BoardEntity,
+    BoardPin as BoardPinEntity,
+    BoardCollaborator as BoardCollaboratorEntity,
+)
 from internal.boards.domain.repositories.board_repository import BoardRepository
-from core.database.models import Board, BoardPin, BoardCollaborator
+
+# Modelos SQLAlchemy — renombrados para evitar colisión con las entidades
+from core.database.models import (
+    Board as BoardModel,
+    BoardPin as BoardPinModel,
+    BoardCollaborator as BoardCollaboratorModel,
+)
 
 
 class MySQLBoardRepository(BoardRepository):
@@ -18,16 +34,23 @@ class MySQLBoardRepository(BoardRepository):
     def __init__(self, db: Session):
         self._db = db
 
-    # ── Mapeo ─────────────────────────────────────────────────
+    # ── Helpers para detectar columnas disponibles ────────────
 
     @staticmethod
-    def _to_board_entity(model: Board) -> Board:
-        return Board(
+    def _model_has_column(model_class, column_name: str) -> bool:
+        """Verifica si el modelo SQLAlchemy tiene una columna dada."""
+        return hasattr(model_class, column_name)
+
+    # ── Mapeo modelo DB → entidad de dominio ──────────────────
+
+    @staticmethod
+    def _to_board_entity(model: BoardModel) -> BoardEntity:
+        return BoardEntity(
             id=model.id,
             user_id=model.user_id,
             name=model.name,
             description=model.description,
-            cover_image_url=model.cover_image_url,
+            cover_image_url=getattr(model, "cover_image_url", None),
             is_private=model.is_private,
             is_collaborative=model.is_collaborative,
             pins_count=model.pins_count or 0,
@@ -36,8 +59,8 @@ class MySQLBoardRepository(BoardRepository):
         )
 
     @staticmethod
-    def _to_board_pin_entity(model: BoardPin) -> BoardPin:
-        return BoardPin(
+    def _to_board_pin_entity(model: BoardPinModel) -> BoardPinEntity:
+        return BoardPinEntity(
             id=model.id,
             board_id=model.board_id,
             pin_id=model.pin_id,
@@ -47,8 +70,8 @@ class MySQLBoardRepository(BoardRepository):
         )
 
     @staticmethod
-    def _to_collaborator_entity(model: BoardCollaborator) -> BoardCollaborator:
-        return BoardCollaborator(
+    def _to_collaborator_entity(model: BoardCollaboratorModel) -> BoardCollaboratorEntity:
+        return BoardCollaboratorEntity(
             id=model.id,
             board_id=model.board_id,
             user_id=model.user_id,
@@ -60,99 +83,106 @@ class MySQLBoardRepository(BoardRepository):
 
     # ── BOARDS CRUD ───────────────────────────────────────────
 
-    async def create(self, board: Board) -> Board:
+    async def create(self, board: BoardEntity) -> BoardEntity:
         now = datetime.now(timezone.utc)
-        model = Board(
-            id=str(uuid.uuid4()),
-            user_id=board.user_id,
-            name=board.name,
-            description=board.description,
-            cover_image_url=board.cover_image_url,
-            is_private=board.is_private,
-            is_collaborative=board.is_collaborative,
-            pins_count=0,
-            created_at=now,
-            updated_at=now,
-        )
+
+        # Campos base que siempre existen en la tabla
+        model_kwargs = {
+            "id": str(uuid.uuid4()),
+            "user_id": board.user_id,
+            "name": board.name,
+            "description": board.description,
+            "is_private": board.is_private,
+            "is_collaborative": board.is_collaborative,
+            "pins_count": 0,
+            "created_at": now,
+            "updated_at": now,
+        }
+
+        # cover_image_url solo si la columna existe en el modelo DB
+        if self._model_has_column(BoardModel, "cover_image_url"):
+            model_kwargs["cover_image_url"] = board.cover_image_url
+
+        model = BoardModel(**model_kwargs)
         self._db.add(model)
         self._db.commit()
         self._db.refresh(model)
         return self._to_board_entity(model)
 
-    async def get_by_id(self, board_id: str) -> Optional[Board]:
-        model = self._db.query(Board).filter(
-            Board.id == board_id
+    async def get_by_id(self, board_id: str) -> Optional[BoardEntity]:
+        model = self._db.query(BoardModel).filter(
+            BoardModel.id == board_id
         ).first()
         return self._to_board_entity(model) if model else None
 
     async def get_by_user(
         self, user_id: str, limit: int = 20, offset: int = 0
-    ) -> List[Board]:
+    ) -> List[BoardEntity]:
         models = (
-            self._db.query(Board)
-            .filter(Board.user_id == user_id)
-            .order_by(Board.updated_at.desc())
+            self._db.query(BoardModel)
+            .filter(BoardModel.user_id == user_id)
+            .order_by(BoardModel.updated_at.desc())
             .offset(offset)
             .limit(limit)
             .all()
         )
         return [self._to_board_entity(m) for m in models]
 
-    async def update(self, board: Board) -> Board:
-        model = self._db.query(Board).filter(
-            Board.id == board.id
+    async def update(self, board: BoardEntity) -> BoardEntity:
+        model = self._db.query(BoardModel).filter(
+            BoardModel.id == board.id
         ).first()
         if model:
             model.name = board.name
             model.description = board.description
-            model.cover_image_url = board.cover_image_url
             model.is_private = board.is_private
             model.is_collaborative = board.is_collaborative
             model.updated_at = datetime.now(timezone.utc)
+            # cover_image_url solo si la columna existe
+            if self._model_has_column(BoardModel, "cover_image_url"):
+                model.cover_image_url = board.cover_image_url
             self._db.commit()
             self._db.refresh(model)
             return self._to_board_entity(model)
         return board
 
     async def delete(self, board_id: str) -> bool:
-        # Eliminar colaboradores
-        self._db.query(BoardCollaborator).filter(
-            BoardCollaborator.board_id == board_id
+        self._db.query(BoardCollaboratorModel).filter(
+            BoardCollaboratorModel.board_id == board_id
         ).delete()
-        # Eliminar board_pins
-        self._db.query(BoardPin).filter(
-            BoardPin.board_id == board_id
+        self._db.query(BoardPinModel).filter(
+            BoardPinModel.board_id == board_id
         ).delete()
-        # Eliminar board
-        deleted = self._db.query(Board).filter(
-            Board.id == board_id
+        deleted = self._db.query(BoardModel).filter(
+            BoardModel.id == board_id
         ).delete()
         self._db.commit()
         return deleted > 0
 
     async def increment_pins_count(self, board_id: str) -> None:
-        self._db.query(Board).filter(
-            Board.id == board_id
-        ).update({Board.pins_count: Board.pins_count + 1})
+        self._db.query(BoardModel).filter(
+            BoardModel.id == board_id
+        ).update({BoardModel.pins_count: BoardModel.pins_count + 1})
         self._db.commit()
 
     async def decrement_pins_count(self, board_id: str) -> None:
-        self._db.query(Board).filter(
-            Board.id == board_id,
-            Board.pins_count > 0
-        ).update({Board.pins_count: Board.pins_count - 1})
+        self._db.query(BoardModel).filter(
+            BoardModel.id == board_id,
+            BoardModel.pins_count > 0
+        ).update({BoardModel.pins_count: BoardModel.pins_count - 1})
         self._db.commit()
 
     async def update_cover_image(self, board_id: str, image_url: str) -> None:
-        self._db.query(Board).filter(
-            Board.id == board_id
-        ).update({Board.cover_image_url: image_url})
-        self._db.commit()
+        if self._model_has_column(BoardModel, "cover_image_url"):
+            self._db.query(BoardModel).filter(
+                BoardModel.id == board_id
+            ).update({BoardModel.cover_image_url: image_url})
+            self._db.commit()
 
     # ── BOARD PINS ────────────────────────────────────────────
 
-    async def add_pin(self, board_pin: BoardPin) -> BoardPin:
-        model = BoardPin(
+    async def add_pin(self, board_pin: BoardPinEntity) -> BoardPinEntity:
+        model = BoardPinModel(
             id=str(uuid.uuid4()),
             board_id=board_pin.board_id,
             pin_id=board_pin.pin_id,
@@ -166,20 +196,20 @@ class MySQLBoardRepository(BoardRepository):
         return self._to_board_pin_entity(model)
 
     async def remove_pin(self, board_id: str, pin_id: str) -> bool:
-        deleted = self._db.query(BoardPin).filter(
-            BoardPin.board_id == board_id,
-            BoardPin.pin_id == pin_id,
+        deleted = self._db.query(BoardPinModel).filter(
+            BoardPinModel.board_id == board_id,
+            BoardPinModel.pin_id == pin_id,
         ).delete()
         self._db.commit()
         return deleted > 0
 
     async def get_board_pins(
         self, board_id: str, limit: int = 20, offset: int = 0
-    ) -> List[BoardPin]:
+    ) -> List[BoardPinEntity]:
         models = (
-            self._db.query(BoardPin)
-            .filter(BoardPin.board_id == board_id)
-            .order_by(BoardPin.created_at.desc())
+            self._db.query(BoardPinModel)
+            .filter(BoardPinModel.board_id == board_id)
+            .order_by(BoardPinModel.created_at.desc())
             .offset(offset)
             .limit(limit)
             .all()
@@ -188,30 +218,29 @@ class MySQLBoardRepository(BoardRepository):
 
     async def is_pin_in_board(self, board_id: str, pin_id: str) -> bool:
         count = (
-            self._db.query(func.count(BoardPin.id))
+            self._db.query(func.count(BoardPinModel.id))
             .filter(
-                BoardPin.board_id == board_id,
-                BoardPin.pin_id == pin_id,
+                BoardPinModel.board_id == board_id,
+                BoardPinModel.pin_id == pin_id,
             )
             .scalar()
         )
         return (count or 0) > 0
 
-    async def get_boards_with_pin(self, pin_id: str, user_id: str) -> List[Board]:
+    async def get_boards_with_pin(self, pin_id: str, user_id: str) -> List[BoardEntity]:
         board_ids = (
-            self._db.query(BoardPin.board_id)
-            .filter(BoardPin.pin_id == pin_id)
+            self._db.query(BoardPinModel.board_id)
+            .filter(BoardPinModel.pin_id == pin_id)
             .all()
         )
         ids = [row[0] for row in board_ids]
         if not ids:
             return []
-
         models = (
-            self._db.query(Board)
+            self._db.query(BoardModel)
             .filter(
-                Board.id.in_(ids),
-                Board.user_id == user_id,
+                BoardModel.id.in_(ids),
+                BoardModel.user_id == user_id,
             )
             .all()
         )
@@ -219,8 +248,8 @@ class MySQLBoardRepository(BoardRepository):
 
     # ── COLLABORATORS ─────────────────────────────────────────
 
-    async def add_collaborator(self, collaborator: BoardCollaborator) -> BoardCollaborator:
-        model = BoardCollaborator(
+    async def add_collaborator(self, collaborator: BoardCollaboratorEntity) -> BoardCollaboratorEntity:
+        model = BoardCollaboratorModel(
             id=str(uuid.uuid4()),
             board_id=collaborator.board_id,
             user_id=collaborator.user_id,
@@ -235,27 +264,27 @@ class MySQLBoardRepository(BoardRepository):
         return self._to_collaborator_entity(model)
 
     async def remove_collaborator(self, board_id: str, user_id: str) -> bool:
-        deleted = self._db.query(BoardCollaborator).filter(
-            BoardCollaborator.board_id == board_id,
-            BoardCollaborator.user_id == user_id,
+        deleted = self._db.query(BoardCollaboratorModel).filter(
+            BoardCollaboratorModel.board_id == board_id,
+            BoardCollaboratorModel.user_id == user_id,
         ).delete()
         self._db.commit()
         return deleted > 0
 
-    async def get_collaborators(self, board_id: str) -> List[BoardCollaborator]:
+    async def get_collaborators(self, board_id: str) -> List[BoardCollaboratorEntity]:
         models = (
-            self._db.query(BoardCollaborator)
-            .filter(BoardCollaborator.board_id == board_id)
+            self._db.query(BoardCollaboratorModel)
+            .filter(BoardCollaboratorModel.board_id == board_id)
             .all()
         )
         return [self._to_collaborator_entity(m) for m in models]
 
     async def is_collaborator(self, board_id: str, user_id: str) -> bool:
         count = (
-            self._db.query(func.count(BoardCollaborator.id))
+            self._db.query(func.count(BoardCollaboratorModel.id))
             .filter(
-                BoardCollaborator.board_id == board_id,
-                BoardCollaborator.user_id == user_id,
+                BoardCollaboratorModel.board_id == board_id,
+                BoardCollaboratorModel.user_id == user_id,
             )
             .scalar()
         )
@@ -268,15 +297,13 @@ class MySQLBoardRepository(BoardRepository):
         can_edit: bool,
         can_add_pins: bool,
         can_remove_pins: bool,
-    ) -> BoardCollaborator:
-        model = self._db.query(BoardCollaborator).filter(
-            BoardCollaborator.board_id == board_id,
-            BoardCollaborator.user_id == user_id,
+    ) -> BoardCollaboratorEntity:
+        model = self._db.query(BoardCollaboratorModel).filter(
+            BoardCollaboratorModel.board_id == board_id,
+            BoardCollaboratorModel.user_id == user_id,
         ).first()
-
         if not model:
             raise ValueError("Colaborador no encontrado")
-
         model.can_edit = can_edit
         model.can_add_pins = can_add_pins
         model.can_remove_pins = can_remove_pins
@@ -286,10 +313,10 @@ class MySQLBoardRepository(BoardRepository):
 
     async def get_collaborative_boards(
         self, user_id: str, limit: int = 20, offset: int = 0
-    ) -> List[Board]:
+    ) -> List[BoardEntity]:
         board_ids = (
-            self._db.query(BoardCollaborator.board_id)
-            .filter(BoardCollaborator.user_id == user_id)
+            self._db.query(BoardCollaboratorModel.board_id)
+            .filter(BoardCollaboratorModel.user_id == user_id)
             .offset(offset)
             .limit(limit)
             .all()
@@ -297,42 +324,30 @@ class MySQLBoardRepository(BoardRepository):
         ids = [row[0] for row in board_ids]
         if not ids:
             return []
-
         models = (
-            self._db.query(Board)
-            .filter(Board.id.in_(ids))
-            .order_by(Board.updated_at.desc())
+            self._db.query(BoardModel)
+            .filter(BoardModel.id.in_(ids))
+            .order_by(BoardModel.updated_at.desc())
             .all()
         )
         return [self._to_board_entity(m) for m in models]
-    
-    
+
     async def get_all(
-        self, 
+        self,
         user_id: Optional[str] = None,
-        limit: int = 20, 
+        limit: int = 20,
         offset: int = 0
-    ) -> List[Board]:
-        """
-        Obtener todos los boards públicos
-        
-        Si se proporciona user_id, filtra por ese usuario.
-        Si no, devuelve todos los boards públicos del sistema.
-        """
-        query = self._db.query(Board).filter(
-            Board.is_private == False  # Solo boards públicos
+    ) -> List[BoardEntity]:
+        query = self._db.query(BoardModel).filter(
+            BoardModel.is_private == False
         )
-        
-        # Filtro opcional por usuario
         if user_id:
-            query = query.filter(Board.user_id == user_id)
-        
+            query = query.filter(BoardModel.user_id == user_id)
         models = (
             query
-            .order_by(Board.updated_at.desc())  # Más recientes primero
+            .order_by(BoardModel.updated_at.desc())
             .offset(offset)
             .limit(limit)
             .all()
         )
-        
         return [self._to_board_entity(m) for m in models]
