@@ -1,5 +1,7 @@
 """
-Rutas HTTP de Boards
+Rutas HTTP de Boards - CORREGIDO
+Problema: GET /api/v1/boards devolvía List[BoardSummary] (array directo)
+pero el cliente Android espera BoardListResponse {boards, total, limit, offset, has_more}
 """
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from typing import Annotated, Optional, List
@@ -25,15 +27,16 @@ from internal.boards.infrastructure.http.board_controller import BoardController
 from internal.boards.infrastructure.dependencies import get_board_controller
 from internal.users.infrastructure.middlewares.auth_middleware import get_current_user_id
 
-
 router = APIRouter(prefix="/boards", tags=["Boards"])
 
 
-# ==================== GET ALL BOARDS (PÚBLICOS) - DEBE IR PRIMERO ====================
+# ── GET /boards ───────────────────────────────────────────────
+# CORRECCIÓN: devuelve BoardListResponse en vez de List[BoardSummary]
+# El cliente Android llama a .body()?.boards para extraer la lista
 
 @router.get(
     "",
-    response_model=List[BoardSummary],
+    response_model=BoardListResponse,   # ← CAMBIADO de List[BoardSummary]
     status_code=status.HTTP_200_OK,
     summary="Get all public boards",
     description="Get list of public boards with optional filters"
@@ -44,26 +47,23 @@ async def get_all_boards(
     offset: int = Query(0, ge=0, description="Offset for pagination"),
     controller: BoardController = Depends(get_board_controller),
 ):
-    """
-    **Get all public boards**
-    
-    Returns a list of public boards with summary information.
-    
-    Query Parameters:
-    - **user_id** (optional): Filter boards by specific user
-    - **limit**: Number of results (default: 20, max: 100)
-    - **offset**: Offset for pagination (default: 0)
-    
-    **No authentication required**
-    """
-    return await controller.get_all_boards(
+    summaries = await controller.get_all_boards(
         user_id=user_id,
         limit=limit,
         offset=offset
     )
+    # Convertir List[BoardSummary] a BoardListResponse para que el Android
+    # pueda extraerlo con .body()?.boards
+    return BoardListResponse(
+        boards=summaries,      # BoardSummary es compatible con BoardDto en el cliente
+        total=len(summaries),
+        limit=limit,
+        offset=offset,
+        has_more=len(summaries) >= limit,
+    )
 
 
-# ==================== BOARDS CRUD ====================
+# ── POST /boards ──────────────────────────────────────────────
 
 @router.post(
     "",
@@ -81,6 +81,8 @@ async def create_board(
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
+
+# ── GET /boards/{board_id} ────────────────────────────────────
 
 @router.get(
     "/{board_id}",
@@ -100,6 +102,8 @@ async def get_board(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
 
 
+# ── GET /boards/user/{user_id} ────────────────────────────────
+
 @router.get(
     "/user/{user_id}",
     response_model=BoardListResponse,
@@ -116,6 +120,8 @@ async def get_user_boards(
         user_id, current_user_id=current_user_id, limit=limit, offset=offset
     )
 
+
+# ── PUT /boards/{board_id} ────────────────────────────────────
 
 @router.put(
     "/{board_id}",
@@ -136,6 +142,8 @@ async def update_board(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
 
 
+# ── DELETE /boards/{board_id} ─────────────────────────────────
+
 @router.delete(
     "/{board_id}",
     response_model=MessageResponse,
@@ -154,7 +162,7 @@ async def delete_board(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
 
 
-# ==================== BOARD PINS ====================
+# ── POST /boards/{board_id}/pins ──────────────────────────────
 
 @router.post(
     "/{board_id}/pins",
@@ -176,6 +184,8 @@ async def add_pin_to_board(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
 
 
+# ── DELETE /boards/{board_id}/pins/{pin_id} ───────────────────
+
 @router.delete(
     "/{board_id}/pins/{pin_id}",
     response_model=MessageResponse,
@@ -194,6 +204,8 @@ async def remove_pin_from_board(
     except PermissionError as e:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
 
+
+# ── GET /boards/{board_id}/pins ───────────────────────────────
 
 @router.get(
     "/{board_id}/pins",
@@ -215,7 +227,7 @@ async def get_board_pins(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
 
 
-# ==================== COLLABORATORS ====================
+# ── POST /boards/{board_id}/collaborators ─────────────────────
 
 @router.post(
     "/{board_id}/collaborators",
@@ -237,6 +249,8 @@ async def add_collaborator(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
 
 
+# ── DELETE /boards/{board_id}/collaborators/{id} ──────────────
+
 @router.delete(
     "/{board_id}/collaborators/{collaborator_user_id}",
     response_model=MessageResponse,
@@ -255,6 +269,8 @@ async def remove_collaborator(
     except PermissionError as e:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
 
+
+# ── PUT /boards/{board_id}/collaborators/{id} ─────────────────
 
 @router.put(
     "/{board_id}/collaborators/{collaborator_user_id}",
@@ -275,6 +291,8 @@ async def update_collaborator(
     except PermissionError as e:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
 
+
+# ── GET /boards/{board_id}/collaborators ──────────────────────
 
 @router.get(
     "/{board_id}/collaborators",
