@@ -65,6 +65,8 @@ async def get_all_boards(
 
 # ── POST /boards ──────────────────────────────────────────────
 
+import traceback # Pon esto hasta arriba del archivo si no está
+
 @router.post(
     "",
     response_model=BoardResponse,
@@ -80,7 +82,11 @@ async def create_board(
         return await controller.create_board(body, user_id)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-
+    except Exception as e:
+        # TRUCO: Si algo explota (Error 500), lo capturamos y lo enviamos al celular
+        error_detalle = traceback.format_exc()
+        print(error_detalle) 
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Fallo en Python: {str(e)}")
 
 # ── GET /boards/{board_id} ────────────────────────────────────
 
@@ -116,9 +122,12 @@ async def get_user_boards(
     controller: BoardController = Depends(get_board_controller),
     current_user_id: str = Depends(get_current_user_id),
 ):
-    return await controller.get_user_boards(
-        user_id, current_user_id=current_user_id, limit=limit, offset=offset
-    )
+    try:
+        return await controller.get_user_boards(
+            user_id, current_user_id=current_user_id, limit=limit, offset=offset
+        )
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Fallo en Python: {str(e)}")
 
 
 # ── PUT /boards/{board_id} ────────────────────────────────────
