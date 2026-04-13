@@ -9,7 +9,6 @@ import json
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_
 
-from app.core.database.models import FCMToken
 from internal.users.domain.entities.user import User
 from internal.users.domain.repositories.user_repository import UserRepository
 from internal.users.infrastructure.database.user_model import User as UserModel
@@ -19,8 +18,6 @@ class MySQLUserRepository(UserRepository):
 
     def __init__(self, db: Session):
         self._db = db
-
-    # ── Mapeo ─────────────────────────────────────────────────
 
     @staticmethod
     def _parse_json_list(value) -> List[str]:
@@ -42,15 +39,15 @@ class MySQLUserRepository(UserRepository):
             return json.dumps(value)
         return None
 
-    def _to_entity(self, model: UserModel) -> User:  # ✅ Cambiar User a UserModel aquí
+    def _to_entity(self, model: UserModel) -> User:
         return User(
             id=model.id,
             username=model.username,
             email=model.email,
-            password_hash=model.password_hash,  # ✅ Usar password_hash del modelo
-            full_name=model.full_name,  # ← Modelo no tiene full_name
+            password_hash=model.password_hash,
+            full_name=model.full_name,
             bio=model.bio,
-            avatar_url=model.avatar_url,  # ✅ Usar avatar_url del modelo
+            avatar_url=model.avatar_url,
             gender=model.gender,
             preferred_styles=self._parse_json_list(model.preferred_styles),
             is_verified=model.is_verified,
@@ -65,8 +62,6 @@ class MySQLUserRepository(UserRepository):
             updated_at=model.updated_at,
             last_login=None,
         )
-
-    # ── CRUD ──────────────────────────────────────────────────
 
     async def create(self, user: User) -> User:
         now = datetime.now(timezone.utc)
@@ -116,7 +111,6 @@ class MySQLUserRepository(UserRepository):
         return self._to_entity(model) if model else None
 
     async def get_by_identity(self, identity: str) -> Optional[User]:
-        """Busca por email o username"""
         identity_lower = identity.lower().strip()
         model = self._db.query(UserModel).filter(
             or_(
@@ -145,7 +139,6 @@ class MySQLUserRepository(UserRepository):
         return user
 
     async def delete(self, user_id: str) -> bool:
-        """Soft delete - desactiva la cuenta"""
         model = self._db.query(UserModel).filter(
             UserModel.id == user_id
         ).first()
@@ -155,8 +148,6 @@ class MySQLUserRepository(UserRepository):
             self._db.commit()
             return True
         return False
-
-    # ── Validaciones ──────────────────────────────────────────
 
     async def exists_by_email(self, email: str) -> bool:
         count = (
@@ -174,21 +165,14 @@ class MySQLUserRepository(UserRepository):
         )
         return (count or 0) > 0
 
-    # ── Seguridad / Login ─────────────────────────────────────
-
     async def update_last_login(self, user_id: str) -> None:
         self._db.query(UserModel).filter(
             UserModel.id == user_id
-        ).update({
-            UserModel.last_login: datetime.now(timezone.utc),
-        })
+        ).update({UserModel.last_login: datetime.now(timezone.utc)})
         self._db.commit()
 
     async def update_login_attempts(
-        self,
-        user_id: str,
-        attempts: int,
-        locked_until: Optional[datetime],
+        self, user_id: str, attempts: int, locked_until: Optional[datetime],
     ) -> None:
         self._db.query(UserModel).filter(
             UserModel.id == user_id
@@ -201,35 +185,23 @@ class MySQLUserRepository(UserRepository):
     async def increment_login_attempts(self, user_id: str) -> None:
         self._db.query(UserModel).filter(
             UserModel.id == user_id
-        ).update({
-            UserModel.login_attempts: UserModel.login_attempts + 1,
-        })
+        ).update({UserModel.login_attempts: UserModel.login_attempts + 1})
         self._db.commit()
 
     async def reset_login_attempts(self, user_id: str) -> None:
         self._db.query(UserModel).filter(
             UserModel.id == user_id
-        ).update({
-            UserModel.login_attempts: 0,
-            UserModel.locked_until: None,
-        })
+        ).update({UserModel.login_attempts: 0, UserModel.locked_until: None})
         self._db.commit()
 
     async def lock_account(self, user_id: str, until: datetime) -> None:
         self._db.query(UserModel).filter(
             UserModel.id == user_id
-        ).update({
-            UserModel.locked_until: until,
-        })
+        ).update({UserModel.locked_until: until})
         self._db.commit()
 
-    # ── Búsqueda ──────────────────────────────────────────────
-
     async def search_users(
-        self,
-        query: str,
-        limit: int = 20,
-        offset: int = 0,
+        self, query: str, limit: int = 20, offset: int = 0,
     ) -> List[User]:
         search_term = f"%{query}%"
         models = (
@@ -248,78 +220,47 @@ class MySQLUserRepository(UserRepository):
         )
         return [self._to_entity(m) for m in models]
 
-    # ── Estadísticas ──────────────────────────────────────────
-
     async def get_user_stats(self, user_id: str) -> dict:
-        """
-        Obtener estadísticas del usuario.
-        TODO: Integrar con tablas reales de pins, follows, boards.
-        Por ahora retorna conteos básicos.
-        """
-        # Importar modelos si existen
         stats = {
             "total_pins": 0,
             "total_followers": 0,
             "total_following": 0,
             "total_boards": 0,
         }
-
         try:
             from core.database.models import Pin
             stats["total_pins"] = (
                 self._db.query(func.count(Pin.id))
-                .filter(Pin.user_id == user_id)
-                .scalar() or 0
+                .filter(Pin.user_id == user_id).scalar() or 0
             )
         except ImportError:
             pass
-
         try:
             from core.database.models import Follow
             stats["total_followers"] = (
                 self._db.query(func.count(Follow.id))
-                .filter(Follow.following_id == user_id)
-                .scalar() or 0
+                .filter(Follow.following_id == user_id).scalar() or 0
             )
             stats["total_following"] = (
                 self._db.query(func.count(Follow.id))
-                .filter(Follow.follower_id == user_id)
-                .scalar() or 0
+                .filter(Follow.follower_id == user_id).scalar() or 0
             )
         except ImportError:
             pass
-
         try:
             from core.database.models import Board
             stats["total_boards"] = (
                 self._db.query(func.count(Board.id))
-                .filter(Board.user_id == user_id)
-                .scalar() or 0
+                .filter(Board.user_id == user_id).scalar() or 0
             )
         except ImportError:
             pass
-
         return stats
-    
 
     async def get_fcm_token(self, user_id: str) -> Optional[str]:
-        """
-        Obtiene el token FCM activo más reciente del usuario.
-        
-        Prioridad:
-        1. Token activo más reciente
-        2. Si no hay activo, retorna None
-        """
-        from core.database.models import FCMToken
-        
+        from core.database.models import FCMToken  # ← import local, correcto
         fcm_record = self._db.query(FCMToken).filter(
             FCMToken.user_id == user_id,
             FCMToken.is_active == True
-        ).order_by(
-            FCMToken.created_at.desc()
-        ).first()
-        
-        if fcm_record:
-            return fcm_record.device_token
-        
-        return None
+        ).order_by(FCMToken.created_at.desc()).first()
+        return fcm_record.device_token if fcm_record else None
