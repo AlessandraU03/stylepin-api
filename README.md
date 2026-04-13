@@ -1,251 +1,314 @@
-# StylePin — Android App 📌
+# StylePin API 🚀
 
-> Red social visual para amantes de la moda. Inspírate, arma tus outfits y compártelos con la comunidad.
+> Backend REST API para StylePin — red social visual de moda. Construida con Python, FastAPI y MySQL, desplegada en AWS EC2 con Docker.
 
 ---
 
 ## ¿Qué es StylePin?
 
-StylePin resuelve la fragmentación de contenido en plataformas generalistas como Pinterest o Instagram, donde los outfits se mezclan con decoración, memes y publicidad irrelevante. StylePin ofrece un feed dedicado **100% a ropa y estilo**, con herramientas de curaduría en tableros, interacción social completa, sincronización inteligente en segundo plano y notificaciones push en tiempo real.
-
----
-
-## Características principales
-
-- 🏠 **Feed de moda** — LazyVerticalStaggeredGrid cargado instantáneamente desde Room (SSoT)
-- 📌 **Pins** — Crea y comparte outfits con imagen (galería o cámara), categoría, temporada, precio y link de compra
-- 🗂️ **Tableros** — Organiza pins en colecciones públicas o privadas, con modo colaborativo
-- ❤️ **Likes optimistas** — El corazón responde al instante y revierte si falla la red
-- 💬 **Comentarios** — Interacción en tiempo real en la vista de detalle de cada pin
-- 👥 **Comunidad** — Sigue usuarios, ve seguidores y seguidos
-- 🔔 **Notificaciones push** — FCM para likes, seguidores y comentarios
-- 🔍 **Explorar** — Busca pins y usuarios
-- 🌙 **Modo oscuro / claro** — Soporte completo con Material Design 3
-- 🔐 **Login biométrico** — Huella dactilar o FaceID (Hardware 1)
-- 📷 **Cámara nativa** — Captura imágenes directamente al crear pins (Hardware 3)
-- 🔦 **Flash LED** — Parpadea al iniciar sesión exitosamente (Hardware 2)
-- ☁️ **Sincronización en segundo plano** — WorkManager cada 12 horas con restricciones de Wi-Fi y batería
+StylePin es una red social visual donde los usuarios pueden inspirarse, armar outfits y compartirlos con la comunidad. Esta API provee todos los servicios que consume la app Android: autenticación JWT, gestión de pins, tableros colaborativos, interacción social (likes, comentarios, follows), notificaciones push via FCM y comunicación en tiempo real via WebSocket.
 
 ---
 
 ## Stack tecnológico
 
-| Capa | Tecnología |
+| Componente | Tecnología |
 |---|---|
-| Lenguaje | Kotlin 2.x |
-| UI | Jetpack Compose + Material Design 3 |
-| Arquitectura | Clean Architecture + MVVM |
-| Inyección de dependencias | Hilt (Dagger 2) |
-| Navegación | Navigation Compose (type-safe routes con `@Serializable`) |
-| Persistencia local | Room v2 + TypeConverters Gson |
-| HTTP | Retrofit 2 + OkHttp + AuthInterceptor JWT |
-| Imágenes | Coil |
-| Background | WorkManager + `@HiltWorker` + `@AssistedInject` |
-| Push notifications | Firebase Cloud Messaging (FCM) |
-| Tiempo real | WebSocket (OkHttp) con `MutableSharedFlow` |
-| Biometría | `BiometricPrompt` |
-| Cámara | `ActivityResultContracts.TakePicture()` + `FileProvider` |
+| Lenguaje | Python 3.10 |
+| Framework | FastAPI |
+| Base de datos | MySQL 8 |
+| ORM | SQLAlchemy |
+| Autenticación | JWT (HS256) con `python-jose` |
+| Push Notifications | Firebase Admin SDK (FCM) |
+| Imágenes | Cloudinary |
+| Tiempo real | WebSocket nativo FastAPI |
+| Contenedores | Docker + Docker Compose |
+| Reverse Proxy | Caddy (HTTPS automático) |
+| Infraestructura | AWS EC2 (Ubuntu 24.04) |
 
 ---
 
 ## Arquitectura
 
+La API sigue **Clean Architecture** con separación estricta de capas:
+
 ```
 app/
+├── main.py                  # Punto de entrada FastAPI
 ├── core/
-│   ├── di/                  # Módulos Hilt globales (Network, Database, Hardware)
-│   ├── navigation/          # Rutas type-safe (@Serializable)
-│   ├── network/             # AuthInterceptor, WebSocketManager, FCMService
-│   └── data/local/          # AppDatabase, Room DAOs
+│   ├── connection.py        # Sesión SQLAlchemy
+│   └── database/
+│       └── models.py        # Modelos ORM (SQLAlchemy)
 │
-└── features/
-    ├── auth/                # Login, Register, Biometría
-    ├── pins/                # Feed, Detalle, Crear, Editar
-    ├── boards/              # Tableros, Detalle, Colaboradores
-    ├── explore/             # Búsqueda de pins y usuarios
-    ├── profile/             # Perfil propio, edición, configuración
-    ├── community/           # Seguidores y seguidos
-    └── notifications/       # Historial de notificaciones
+└── internal/
+    ├── auth/
+    │   ├── domain/          # Entidades + interfaces de repositorio
+    │   ├── application/     # Casos de uso (login, register, refresh)
+    │   └── infrastructure/  # Controladores HTTP, middlewares JWT, adaptadores MySQL
+    ├── pins/
+    ├── boards/
+    ├── likes/
+    ├── follows/
+    ├── comments/
+    ├── notifications/
+    └── users/
 ```
 
-Cada feature sigue la estructura:
+Cada módulo interno sigue la misma estructura:
 ```
 feature/
-├── data/
-│   ├── datasources/remote/  # API interfaces (Retrofit), DTOs, Mappers
-│   ├── datasources/local/   # DAO, Entities, Mappers
-│   └── repositories/        # Implementación del repositorio
 ├── domain/
-│   ├── entities/            # Modelos de dominio
-│   ├── repository/          # Interfaz del repositorio
-│   └── usecases/            # Casos de uso
-└── presentation/
-    ├── screens/             # Composables
-    ├── viewmodels/          # ViewModels + UiState
-    └── components/          # Componentes reutilizables
+│   ├── entities/            # Dataclasses de dominio
+│   └── repository/          # Interfaces abstractas
+├── application/
+│   └── use_cases/           # Lógica de negocio pura
+└── infrastructure/
+    ├── adapters/             # Implementaciones MySQL (SQLAlchemy)
+    ├── http/                 # Routes + Controllers (FastAPI)
+    └── dependencies.py      # Inyección de dependencias (FastAPI Depends)
 ```
 
 ---
 
-## Flujo de datos reactivo
+## Endpoints disponibles
 
-```
-Room (PinDao)
-    └── Flow<List<PinEntity>>
-            └── PinRepositoryImpl.getPinsFlow()
-                    └── PinsViewModel (colecta con launchIn)
-                            └── StateFlow<PinsUiState>
-                                    └── PinsScreen (collectAsStateWithLifecycle)
-```
+Base URL: `https://stylepin.ddns.net/api/v1`
 
-Al llamar `refreshPins()`, Retrofit descarga la lista, la inserta en Room con `REPLACE`, y Room notifica automáticamente a todos los colectores activos — sin polling manual.
+### 🔐 Auth
+| Método | Endpoint | Descripción |
+|---|---|---|
+| `POST` | `/auth/register` | Registro de nuevo usuario |
+| `POST` | `/auth/login` | Login con email/contraseña → JWT |
+| `POST` | `/auth/refresh` | Renovar token JWT |
+| `GET` | `/auth/me` | Perfil del usuario autenticado |
+
+### 📌 Pins
+| Método | Endpoint | Descripción |
+|---|---|---|
+| `GET` | `/pins` | Listar pins públicos (paginado) |
+| `POST` | `/pins` | Crear pin (multipart/form-data con imagen) |
+| `GET` | `/pins/{pin_id}` | Obtener pin por ID |
+| `PUT` | `/pins/{pin_id}` | Editar pin |
+| `DELETE` | `/pins/{pin_id}` | Eliminar pin |
+| `GET` | `/pins/search` | Buscar pins por texto |
+| `GET` | `/pins/user/{user_id}` | Pins de un usuario |
+
+### 🗂️ Boards
+| Método | Endpoint | Descripción |
+|---|---|---|
+| `GET` | `/boards` | Listar tableros públicos |
+| `POST` | `/boards` | Crear tablero |
+| `GET` | `/boards/{board_id}` | Obtener tablero |
+| `PUT` | `/boards/{board_id}` | Editar tablero |
+| `DELETE` | `/boards/{board_id}` | Eliminar tablero |
+| `GET` | `/boards/user/{user_id}` | Tableros de un usuario |
+| `POST` | `/boards/{board_id}/pins` | Agregar pin al tablero |
+| `DELETE` | `/boards/{board_id}/pins/{pin_id}` | Quitar pin del tablero |
+| `GET` | `/boards/{board_id}/pins` | Pins de un tablero |
+| `POST` | `/boards/{board_id}/collaborators` | Agregar colaborador |
+| `DELETE` | `/boards/{board_id}/collaborators/{user_id}` | Quitar colaborador |
+| `PUT` | `/boards/{board_id}/collaborators/{user_id}` | Actualizar permisos de colaborador |
+| `GET` | `/boards/{board_id}/collaborators` | Listar colaboradores |
+
+### ❤️ Likes
+| Método | Endpoint | Descripción |
+|---|---|---|
+| `POST` | `/likes` | Toggle like a un pin |
+| `GET` | `/likes/status/{pin_id}` | Estado de like del usuario autenticado |
+| `GET` | `/likes/pins/{pin_id}` | Usuarios que dieron like a un pin |
+
+### 💬 Comments
+| Método | Endpoint | Descripción |
+|---|---|---|
+| `POST` | `/comments` | Crear comentario o respuesta |
+| `GET` | `/comments/pin/{pin_id}` | Comentarios de un pin |
+| `PUT` | `/comments/{comment_id}` | Editar comentario |
+| `DELETE` | `/comments/{comment_id}` | Eliminar comentario |
+| `POST` | `/comments/{comment_id}/like` | Dar like a un comentario |
+
+### 👥 Follows
+| Método | Endpoint | Descripción |
+|---|---|---|
+| `POST` | `/follows` | Seguir a un usuario |
+| `DELETE` | `/follows/{user_id}` | Dejar de seguir |
+| `GET` | `/follows/{user_id}/followers` | Seguidores de un usuario |
+| `GET` | `/follows/{user_id}/following` | Usuarios que sigue |
+| `GET` | `/follows/{user_id}/counts` | Contadores de seguidores/seguidos |
+| `GET` | `/follows/status/{user_id}` | Estado de follow con otro usuario |
+
+### 🔔 Notifications
+| Método | Endpoint | Descripción |
+|---|---|---|
+| `GET` | `/notifications` | Historial de notificaciones del usuario |
+| `PUT` | `/notifications/{notification_id}/read` | Marcar como leída |
+| `GET` | `/notifications/test` | Enviar notificación de prueba |
+
+### 👤 Users
+| Método | Endpoint | Descripción |
+|---|---|---|
+| `GET` | `/users/{user_id}` | Perfil público de un usuario |
+| `PUT` | `/users/me` | Editar perfil propio |
+| `POST` | `/users/fcm-token` | Registrar token FCM del dispositivo |
+| `GET` | `/users/search` | Buscar usuarios por nombre/username |
+
+### ⚡ WebSocket
+| Endpoint | Descripción |
+|---|---|
+| `wss://stylepin.ddns.net/ws?token=JWT` | Conexión en tiempo real para alertas |
 
 ---
 
-## Patrón de actualización optimista
+## Autenticación
 
-```kotlin
-fun toggleLike(pinId: String) {
-    val pin = _uiState.value.pinDetail ?: return
-    val currentLiked = pin.isLikedByMe
-    // 1. Actualizar UI al instante
-    _uiState.update { state ->
-        state.copy(pinDetail = pin.copy(
-            isLikedByMe = !currentLiked,
-            likesCount = pin.likesCount + if (currentLiked) -1 else 1
-        ))
-    }
-    viewModelScope.launch {
-        // 2. Petición real al servidor
-        toggleLikeUseCase(pinId, currentLiked).onFailure {
-            // 3. Revertir si falla
-            _uiState.update { state -> state.copy(pinDetail = pin) }
-        }
-    }
-}
+Todos los endpoints (excepto `/auth/register` y `/auth/login`) requieren el header:
+
+```
+Authorization: Bearer <token_jwt>
+```
+
+El token se obtiene en `POST /auth/login` y tiene expiración configurable. Si expira, usa `POST /auth/refresh`.
+
+---
+
+## Modelos de base de datos
+
+```sql
+users           — id, username, email, password_hash, full_name, bio, avatar_url, role
+pins            — id, user_id, image_url, title, description, category, season, likes_count
+boards          — id, user_id, name, is_private, is_collaborative, pins_count
+board_pins      — id, board_id, pin_id, user_id, notes
+board_collaborators — id, board_id, user_id, can_edit, can_add_pins, can_remove_pins
+likes           — id, user_id, pin_id
+follows         — id, follower_id, following_id
+comments        — id, pin_id, user_id, text, parent_comment_id, likes_count
+notifications   — id, user_id, actor_id, type, title, body, is_read
+fcm_tokens      — id, user_id, device_token, device_name, is_active
 ```
 
 ---
 
-## Requisitos previos
+## Instalación y despliegue
 
-- Android Studio Hedgehog o superior
-- JDK 21
-- Android SDK 36 (minSdk 26)
-- Cuenta de Firebase con un proyecto configurado
-- Archivo `google-services.json` colocado en `app/`
-- Archivo `local.properties` con las variables de entorno (ver abajo)
+### Requisitos
 
----
-
-## Configuración
+- Docker y Docker Compose instalados
+- Dominio con DNS apuntando al servidor (para HTTPS automático con Caddy)
+- Cuenta de Firebase con `serviceAccountKey.json`
+- Cuenta de Cloudinary
 
 ### 1. Clonar el repositorio
 
 ```bash
-git clone https://github.com/AlessandraU03/Stylepin-App.git
-cd Stylepin-App
+git clone https://github.com/AlessandraU03/stylepin-api.git
+cd stylepin-api
 ```
 
-### 2. Configurar variables de entorno
+### 2. Variables de entorno
 
-Crea o edita `local.properties` en la raíz del proyecto:
+Crea un archivo `.env` en la raíz:
 
-```properties
-BASE_URL_STYLEPIN=https://stylepin.ddns.net/
+```env
+# Base de datos
+DB_HOST=db
+DB_PORT=3306
+DB_NAME=stylepin
+DB_USER=stylepin_user
+DB_PASSWORD=tu_password_seguro
+
+# JWT
+SECRET_KEY=tu_clave_secreta_muy_larga
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=1440
+
+# Cloudinary
+CLOUDINARY_CLOUD_NAME=tu_cloud_name
+CLOUDINARY_API_KEY=tu_api_key
+CLOUDINARY_API_SECRET=tu_api_secret
+
+# Firebase
+FIREBASE_CREDENTIALS_PATH=/app/serviceAccountKey.json
 ```
 
-### 3. Agregar Firebase
+### 3. Firebase
 
-Descarga `google-services.json` desde tu consola de Firebase y colócalo en `app/google-services.json`.
+Coloca tu archivo `serviceAccountKey.json` en la raíz del proyecto.
 
-### 4. Compilar
+### 4. Levantar con Docker Compose
 
 ```bash
-./gradlew assembleDev       # Build de desarrollo
-./gradlew assembleProd      # Build de producción
+docker-compose up -d --build
 ```
 
-O directamente desde Android Studio con el flavor `dev` o `prod`.
+Esto levanta 3 servicios:
+- **api** — FastAPI en puerto 8000
+- **caddy** — Reverse proxy con HTTPS automático en puertos 80/443
+- **db** — MySQL 8 (opcional si usas una DB externa)
+
+### 5. Verificar
+
+```bash
+docker ps
+docker logs stylepin-api_api_1 --tail 50
+```
+
+La documentación interactiva estará disponible en:
+- Swagger UI: `https://tu-dominio/docs`
+- ReDoc: `https://tu-dominio/redoc`
 
 ---
 
-## Product Flavors
+## Despliegue en producción (AWS EC2)
 
-| Flavor | Descripción |
-|---|---|
-| `dev` | Nombre de app: **StylePin (DEV)** — para desarrollo y pruebas |
-| `prod` | Nombre de app: **StylePin** — para producción |
+El servidor de producción corre en una instancia EC2 de AWS (Ubuntu 24.04). El flujo de despliegue es:
+
+```bash
+# En el servidor EC2
+cd ~/stylepin-api
+git fetch origin
+git pull origin correciones
+docker-compose down
+docker-compose up -d --build
+```
+
+Caddy gestiona automáticamente los certificados SSL/TLS con Let's Encrypt.
 
 ---
 
-## WorkManager — Sincronización
-
-| Modalidad | Frecuencia | Restricciones |
-|---|---|---|
-| Automática | Cada 12 horas | Solo Wi-Fi + batería no baja |
-| Manual | Al instante | Sin restricciones |
-
-La sincronización manual está disponible en **Configuración → Sincronización de pines**.
-
-El worker usa `@HiltWorker` + `@AssistedInject` para inyección limpia del `PinsRepository`. Requiere deshabilitar el inicializador por defecto de WorkManager en `AndroidManifest.xml`:
-
-```xml
-<provider
-    android:name="androidx.startup.InitializationProvider"
-    android:authorities="${applicationId}.androidx-startup"
-    android:exported="false"
-    tools:node="merge">
-    <meta-data
-        android:name="androidx.work.WorkManagerInitializer"
-        android:value="androidx.startup"
-        tools:node="remove" />
-</provider>
-```
-
----
-
-## Notificaciones Push FCM — Flujo completo
+## Flujo de notificaciones push
 
 ```
-Login exitoso
-    └── LoginViewModel solicita token FCM
-            └── POST /api/v1/users/fcm-token
-                    └── Backend guarda token en tabla fcm_tokens
-
 Evento (like / follow / comment)
-    └── Backend obtiene token del usuario destino
-            └── Firebase Admin SDK envía push
-                    └── StylePinFirebaseMessagingService.onMessageReceived()
-                            └── NotificationChannel → pantalla de bloqueo / pantalla Notificaciones
+    └── Use Case guarda Notification en tabla notifications
+            └── Use Case obtiene FCM token del usuario destino
+                    └── Firebase Admin SDK envía push notification
+                            └── App Android recibe en FirebaseMessagingService
 ```
+
+Los tipos de notificación soportados son: `like`, `follow`, `comment`, `board_collaboration`.
 
 ---
 
-## Retos técnicos resueltos
+## Documentación interactiva
 
-| Problema | Solución |
-|---|---|
-| KSP falla con Room + Hilt en funciones DAO que retornan `Unit` | Cambiar `clearAll()` de `Unit` a `Int` (filas eliminadas) |
-| WorkManager no inyecta dependencias con `@Inject` estándar | Usar `@HiltWorker` + `@AssistedInject` + `HiltWorkerFactory` en `StylePinApp` |
-| HTTP 307 Redirect pierde el header `Authorization` | Eliminar trailing slash de la URL en `NotificationApi.kt` |
-| SQLite no soporta columnas de tipo array | `TypeConverters` con Gson para serializar `List<String>` a JSON |
-| Estado de like inconsistente entre UI y servidor | Sets estáticos `localLikedPins` como fuente de verdad local durante la sesión |
+La API incluye documentación Swagger completa en:
+
+```
+https://stylepin.ddns.net/docs
+```
 
 ---
 
 ## Repositorios relacionados
 
-- **Backend API (Python/FastAPI):** [stylepin-api](https://github.com/AlessandraU03/stylepin-api)
-- **App Android (este repositorio):** [Stylepin-App](https://github.com/AlessandraU03/Stylepin-App)
+- **Backend API (este repositorio):** [stylepin-api](https://github.com/AlessandraU03/stylepin-api)
+- **App Android (Kotlin/Compose):** [Stylepin-App](https://github.com/AlessandraU03/Stylepin-App)
 
 ---
 
 ## Desarrollado por
 
-* **Alessandra Ulloa** — [@AlessandraU03](https://github.com/AlessandraU03)
-* **Alhan Velasco** — [@alhan-velasco](https://github.com/alhan-velasco)
-
+**Alessandra Ulloa** — [@AlessandraU03](https://github.com/AlessandraU03)
+**Alhan Velasco** — [@alhan-velasco](https://github.com/alhan-velasco)
 ---
 
 *StylePin — Viste el mundo a tu manera* 📌
