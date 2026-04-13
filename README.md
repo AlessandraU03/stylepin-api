@@ -243,8 +243,8 @@ Evento (like / follow / comment)
 
 ## Desarrollado por
 
-**Alessandra Ulloa** — [@AlessandraU03](https://github.com/AlessandraU03)
-**Alhan Velasco** — [@alhan-velasco]((https://github.com/alhan-velasco))
+* **Alessandra Ulloa** — [@AlessandraU03](https://github.com/AlessandraU03)
+* **Alhan Velasco** — [@alhan-velasco](https://github.com/alhan-velasco)
 
 ---
 
