@@ -168,7 +168,7 @@ class Comment(Base):
     )
 
 # =====================================================
-# BOARDS  ← CORREGIDO: se agregan las columnas faltantes
+# BOARDS
 # =====================================================
 
 class Board(Base):
@@ -178,10 +178,10 @@ class Board(Base):
     user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     name = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
-    cover_image_url = Column(String(500), nullable=True)       # ← AGREGADO
+    cover_image_url = Column(String(500), nullable=True)
     is_private = Column(Boolean, default=False)
-    is_collaborative = Column(Boolean, default=False)          # ← AGREGADO
-    pins_count = Column(Integer, default=0)                    # ← AGREGADO
+    is_collaborative = Column(Boolean, default=False)
+    pins_count = Column(Integer, default=0)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -197,7 +197,7 @@ class Board(Base):
     )
 
 # =====================================================
-# BOARD PINS  ← CORREGIDO: se agregan columnas faltantes
+# BOARD PINS
 # =====================================================
 
 class BoardPin(Base):
@@ -206,8 +206,8 @@ class BoardPin(Base):
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     board_id = Column(String(36), ForeignKey("boards.id", ondelete="CASCADE"), nullable=False)
     pin_id = Column(String(36), ForeignKey("pins.id", ondelete="CASCADE"), nullable=False)
-    user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=True)  # ← AGREGADO
-    notes = Column(Text, nullable=True)                        # ← AGREGADO
+    user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
+    notes = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # Relaciones
@@ -220,7 +220,7 @@ class BoardPin(Base):
     )
 
 # =====================================================
-# BOARD COLLABORATORS  ← CORREGIDO: columnas faltantes
+# BOARD COLLABORATORS
 # =====================================================
 
 class BoardCollaborator(Base):
@@ -230,8 +230,8 @@ class BoardCollaborator(Base):
     board_id = Column(String(36), ForeignKey("boards.id", ondelete="CASCADE"), nullable=False)
     user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     can_edit = Column(Boolean, default=False)
-    can_add_pins = Column(Boolean, default=True)               # ← AGREGADO
-    can_remove_pins = Column(Boolean, default=False)           # ← AGREGADO
+    can_add_pins = Column(Boolean, default=True)
+    can_remove_pins = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # Relaciones
@@ -244,7 +244,7 @@ class BoardCollaborator(Base):
     )
 
 # =====================================================
-# NOTIFICATIONS
+# NOTIFICATIONS  ← FIX: usar String en lugar de Enum(NotificationType)
 # =====================================================
 
 class Notification(Base):
@@ -253,7 +253,10 @@ class Notification(Base):
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     actor_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    type = Column(Enum(NotificationType), nullable=False)
+    # ← FIX: String(50) en vez de Enum(NotificationType)
+    # Enum(NotificationType) almacena el nombre del enum (LIKE, FOLLOW...)
+    # pero MySQL tiene el ENUM definido con valores en minúsculas (like, follow...)
+    type = Column(String(50), nullable=False)
     pin_id = Column(String(36), ForeignKey("pins.id", ondelete="SET NULL"), nullable=True)
     comment_id = Column(String(36), ForeignKey("comments.id", ondelete="SET NULL"), nullable=True)
     board_id = Column(String(36), ForeignKey("boards.id", ondelete="SET NULL"), nullable=True)
