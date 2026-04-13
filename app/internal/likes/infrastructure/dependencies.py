@@ -1,5 +1,5 @@
 """
-Inyección de dependencias para Likes
+Inyección de dependencias para Likes - CORREGIDO
 """
 from fastapi import Depends
 from sqlalchemy.orm import Session
@@ -8,6 +8,7 @@ from core.connection import get_db
 from internal.likes.infrastructure.adapters.mysql_like_repository import MySQLLikeRepository
 from internal.pines.infrastructure.adapters.mysql_pin_repository import MySQLPinRepository
 from internal.users.infrastructure.adapters.mysql_user_repository import MySQLUserRepository
+from internal.notifications.infrastructure.http.mysql_notificarion_repository import MySQLNotificationRepository
 
 from internal.likes.application.use_cases.toggle_like import ToggleLikeUseCase
 from internal.likes.application.use_cases.like_pin import LikePinUseCase
@@ -20,14 +21,20 @@ from internal.likes.infrastructure.http.like_controller import LikeController
 
 
 def get_like_controller(db: Session = Depends(get_db)) -> LikeController:
-    like_repo = MySQLLikeRepository(db)
-    pin_repo  = MySQLPinRepository(db)
-    user_repo = MySQLUserRepository(db)
+    like_repo         = MySQLLikeRepository(db)
+    pin_repo          = MySQLPinRepository(db)
+    user_repo         = MySQLUserRepository(db)
+    notification_repo = MySQLNotificationRepository(db)  # ← NUEVO
 
     return LikeController(
-        like_uc=LikePinUseCase(like_repo, pin_repo),        # ← faltaba pin_repo
-        unlike_uc=UnlikePinUseCase(like_repo, pin_repo),    # ← faltaba pin_repo
-        toggle_like_uc=ToggleLikeUseCase(like_repo, pin_repo, user_repo),
+        like_uc=LikePinUseCase(like_repo, pin_repo),
+        unlike_uc=UnlikePinUseCase(like_repo, pin_repo),
+        toggle_like_uc=ToggleLikeUseCase(
+            like_repository=like_repo,
+            pin_repository=pin_repo,
+            user_repository=user_repo,
+            notification_repository=notification_repo,   # ← NUEVO
+        ),
         get_pin_likes_uc=GetPinLikesUseCase(like_repo),
         get_user_likes_uc=GetUserLikesUseCase(like_repo),
         check_status_uc=CheckLikeStatusUseCase(like_repo),
