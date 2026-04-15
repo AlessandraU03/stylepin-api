@@ -1,5 +1,5 @@
 """
-Controlador HTTP de Follows
+Controlador HTTP de Follows - CORREGIDO
 """
 import logging
 
@@ -19,7 +19,6 @@ from internal.follows.application.schemas.follow_schemas import (
     FollowCountsResponse,
     MessageResponse,
 )
-from core.notifications import notify_new_follow
 
 logger = logging.getLogger(__name__)
 
@@ -46,17 +45,11 @@ class FollowController:
     # ── Follow / Unfollow ─────────────────────────────────────
 
     async def follow_user(self, body: FollowUserRequest, current_user_id: str) -> MessageResponse:
+        # FollowUserUseCase ya maneja la notificación internamente
         await self._follow_uc.execute(
             follower_id=current_user_id,
             following_id=body.user_id,
         )
-
-        # 🔔 Notificar al usuario seguido
-        try:
-            await self._send_follow_notification(current_user_id, body.user_id)
-        except Exception as e:
-            logger.warning(f"⚠️ No se pudo enviar notificación de follow: {e}")
-
         return MessageResponse(message="Ahora sigues a este usuario")
 
     async def unfollow_user(self, target_user_id: str, current_user_id: str) -> MessageResponse:
@@ -66,26 +59,9 @@ class FollowController:
         )
         return MessageResponse(message="Dejaste de seguir a este usuario")
 
-    # ── Notificación ──────────────────────────────────────────
-
-    async def _send_follow_notification(self, follower_id: str, following_id: str):
-        """Obtiene username del follower y envía notificación"""
-        if not self._db:
-            return
-
-        from core.database.models import User
-
-        follower = self._db.query(User).filter(User.id == follower_id).first()
-        follower_username = follower.username if follower else "alguien"
-
-        await notify_new_follow(
-            followed_user_id=following_id,
-            follower_username=follower_username,
-            follower_id=follower_id,
-        )
-        logger.info(f"🔔 Follow: {follower_username} → {following_id}")
-
-    # ── Listas ────────────────────────────────────────────────
+    # ── Listas CON nombres de usuario ────────────────────────
+    # CORRECCIÓN PRINCIPAL: hacemos JOIN con la tabla users para obtener
+    # username, full_name y avatar_url reales
 
     async def get_followers(
         self,
@@ -100,6 +76,9 @@ class FollowController:
 
         profiles = []
         for follow in result["followers"]:
+            # CORRECCIÓN: buscar datos reales del usuario seguidor
+            user_data = self._get_user_data(follow.follower_id)
+
             is_following_back = False
             if current_user_id:
                 status = await self._check_status_uc.execute(
@@ -109,10 +88,10 @@ class FollowController:
 
             profiles.append(FollowerProfile(
                 user_id=follow.follower_id,
-                username="",
-                full_name="",
-                avatar_url=None,
-                is_verified=False,
+                username=user_data["username"],
+                full_name=user_data["full_name"],
+                avatar_url=user_data["avatar_url"],
+                is_verified=user_data["is_verified"],
                 is_following_back=is_following_back,
             ))
 
@@ -137,6 +116,9 @@ class FollowController:
 
         profiles = []
         for follow in result["following"]:
+            # CORRECCIÓN: buscar datos reales del usuario seguido
+            user_data = self._get_user_data(follow.following_id)
+
             is_followed_by_me = False
             if current_user_id:
                 status = await self._check_status_uc.execute(
@@ -146,10 +128,10 @@ class FollowController:
 
             profiles.append(FollowingProfile(
                 user_id=follow.following_id,
-                username="",
-                full_name="",
-                avatar_url=None,
-                is_verified=False,
+                username=user_data["username"],
+                full_name=user_data["full_name"],
+                avatar_url=user_data["avatar_url"],
+                is_verified=user_data["is_verified"],
                 is_followed_by_me=is_followed_by_me,
             ))
 
@@ -160,6 +142,26 @@ class FollowController:
             offset=result["offset"],
             has_more=result["has_more"],
         )
+
+    # ── Helper: obtener datos de usuario desde DB ─────────────
+
+    def _get_user_data(self, user_id: str) -> dict:
+        """Obtiene username, full_name, avatar_url e is_verified de un usuario."""
+        if not self._db:
+            return {"username": "", "full_name": "", "avatar_url": None, "is_verified": False}
+        try:
+            from core.database.models import User
+            user = self._db.query(User).filter(User.id == user_id).first()
+            if user:
+                return {
+                    "username": user.username or "",
+                    "full_name": user.full_name or user.username or "",
+                    "avatar_url": user.avatar_url,
+                    "is_verified": user.is_verified or False,
+                }
+        except Exception as e:
+            logger.error(f"Error obteniendo usuario {user_id}: {e}")
+        return {"username": "", "full_name": "", "avatar_url": None, "is_verified": False}
 
     # ── Status / Counts ───────────────────────────────────────
 

@@ -1,7 +1,9 @@
 """
-Controlador HTTP de Boards
+Controlador HTTP de Boards - CORREGIDO
+Problema original: _to_response ponía "" en user_username y user_full_name
 """
 from typing import List, Optional
+
 from fastapi import HTTPException, status
 
 from internal.boards.application.use_cases.create_board import CreateBoardUseCase
@@ -30,6 +32,9 @@ from internal.boards.application.schemas.board_schemas import (
     MessageResponse,
 )
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class BoardController:
     def __init__(
@@ -37,7 +42,7 @@ class BoardController:
         create_uc: CreateBoardUseCase,
         get_uc: GetBoardUseCase,
         get_user_boards_uc: GetUserBoardsUseCase,
-        get_all_boards_uc: GetAllBoardsUseCase,  # NUEVO
+        get_all_boards_uc: GetAllBoardsUseCase,
         update_uc: UpdateBoardUseCase,
         delete_uc: DeleteBoardUseCase,
         add_pin_uc: AddPinToBoardUseCase,
@@ -46,11 +51,12 @@ class BoardController:
         add_collab_uc: AddCollaboratorUseCase,
         remove_collab_uc: RemoveCollaboratorUseCase,
         update_collab_uc: UpdateCollaboratorUseCase,
+        db_session=None,   # ← NUEVO: sesión de DB para consultar usuarios
     ):
         self._create_uc = create_uc
         self._get_uc = get_uc
         self._get_user_boards_uc = get_user_boards_uc
-        self._get_all_boards_uc = get_all_boards_uc  # NUEVO
+        self._get_all_boards_uc = get_all_boards_uc
         self._update_uc = update_uc
         self._delete_uc = delete_uc
         self._add_pin_uc = add_pin_uc
@@ -59,20 +65,43 @@ class BoardController:
         self._add_collab_uc = add_collab_uc
         self._remove_collab_uc = remove_collab_uc
         self._update_collab_uc = update_collab_uc
+        self._db = db_session
 
-    @staticmethod
+    # ── Helper: obtener datos de usuario ─────────────────────
+
+    def _get_user_data(self, user_id: str) -> dict:
+        """Obtiene datos del usuario desde DB para rellenar respuestas."""
+        if not self._db:
+            return {"username": "", "full_name": "", "avatar_url": None}
+        try:
+            from core.database.models import User
+            user = self._db.query(User).filter(User.id == user_id).first()
+            if user:
+                return {
+                    "username": user.username or "",
+                    "full_name": user.full_name or user.username or "",
+                    "avatar_url": user.avatar_url,
+                }
+        except Exception as e:
+            logger.error(f"Error obteniendo usuario {user_id}: {e}")
+        return {"username": "", "full_name": "", "avatar_url": None}
+
+    # ── Mapeo Board → BoardResponse ───────────────────────────
+
     def _to_response(
+        self,
         board: Board,
         current_user_id: str = None,
         is_collaborator: bool = False,
     ) -> BoardResponse:
-        """Convierte entidad Board a BoardResponse"""
+        # CORRECCIÓN: obtener datos reales del usuario dueño
+        user_data = self._get_user_data(board.user_id)
         return BoardResponse(
             id=board.id,
             user_id=board.user_id,
-            user_username="",       # TODO: obtener del usuario real
-            user_full_name="",      # TODO: obtener del usuario real
-            user_avatar_url=None,   # TODO: obtener del usuario real
+            user_username=user_data["username"],
+            user_full_name=user_data["full_name"],
+            user_avatar_url=user_data["avatar_url"],
             name=board.name,
             description=board.description,
             cover_image_url=board.cover_image_url,
@@ -85,7 +114,7 @@ class BoardController:
             is_collaborator=is_collaborator,
         )
 
-    # ── Boards ────────────────────────────────────────────────
+    # ── Boards CRUD ───────────────────────────────────────────
 
     async def create_board(self, body: CreateBoardRequest, user_id: str) -> BoardResponse:
         board = await self._create_uc.execute(
@@ -99,25 +128,17 @@ class BoardController:
 
     async def get_board(self, board_id: str, user_id: str = None) -> BoardResponse:
         board = await self._get_uc.execute(board_id, requesting_user_id=user_id)
-        return self._to_response(board, current_user_id=user_id)
-    
+        is_collab = False
+        if user_id and board.user_id != user_id:
+            is_collab = await self._add_collab_uc._repo.is_collaborator(board_id, user_id)
+        return self._to_response(board, current_user_id=user_id, is_collaborator=is_collab)
+
     async def get_all_boards(
         self,
         user_id: Optional[str] = None,
         limit: int = 20,
         offset: int = 0
     ) -> List[BoardSummary]:
-        """
-        Obtener todos los boards públicos
-        
-        Args:
-            user_id: (Opcional) Filtrar por usuario específico
-            limit: Número de resultados (default: 20)
-            offset: Offset para paginación (default: 0)
-            
-        Returns:
-            Lista de BoardSummary
-        """
         try:
             return await self._get_all_boards_uc.execute(
                 user_id=user_id,
@@ -199,7 +220,22 @@ class BoardController:
             has_more=result["has_more"],
         )
 
-    # ── Collaborators ─────────────────────────────────────────
+    # ── Collaborators CON datos reales ────────────────────────
+
+    def _collab_to_response(self, collab) -> BoardCollaboratorResponse:
+        user_data = self._get_user_data(collab.user_id)
+        return BoardCollaboratorResponse(
+            id=collab.id,
+            board_id=collab.board_id,
+            user_id=collab.user_id,
+            user_username=user_data["username"],
+            user_full_name=user_data["full_name"],
+            user_avatar_url=user_data["avatar_url"],
+            can_edit=collab.can_edit,
+            can_add_pins=collab.can_add_pins,
+            can_remove_pins=collab.can_remove_pins,
+            created_at=collab.created_at,
+        )
 
     async def add_collaborator(
         self, board_id: str, body: AddCollaboratorRequest, owner_id: str
@@ -212,18 +248,7 @@ class BoardController:
             can_add_pins=body.can_add_pins,
             can_remove_pins=body.can_remove_pins,
         )
-        return BoardCollaboratorResponse(
-            id=collab.id,
-            board_id=collab.board_id,
-            user_id=collab.user_id,
-            user_username="",       # TODO: obtener del usuario real
-            user_full_name="",      # TODO: obtener del usuario real
-            user_avatar_url=None,   # TODO: obtener del usuario real
-            can_edit=collab.can_edit,
-            can_add_pins=collab.can_add_pins,
-            can_remove_pins=collab.can_remove_pins,
-            created_at=collab.created_at,
-        )
+        return self._collab_to_response(collab)
 
     async def remove_collaborator(
         self, board_id: str, collaborator_user_id: str, owner_id: str
@@ -236,7 +261,8 @@ class BoardController:
         return MessageResponse(message="Colaborador removido")
 
     async def update_collaborator(
-        self, board_id: str, collaborator_user_id: str, body: UpdateCollaboratorRequest, owner_id: str
+        self, board_id: str, collaborator_user_id: str,
+        body: UpdateCollaboratorRequest, owner_id: str
     ) -> BoardCollaboratorResponse:
         collab = await self._update_collab_uc.execute(
             board_id=board_id,
@@ -246,38 +272,11 @@ class BoardController:
             can_add_pins=body.can_add_pins,
             can_remove_pins=body.can_remove_pins,
         )
-        return BoardCollaboratorResponse(
-            id=collab.id,
-            board_id=collab.board_id,
-            user_id=collab.user_id,
-            user_username="",       # TODO: obtener del usuario real
-            user_full_name="",      # TODO: obtener del usuario real
-            user_avatar_url=None,   # TODO: obtener del usuario real
-            can_edit=collab.can_edit,
-            can_add_pins=collab.can_add_pins,
-            can_remove_pins=collab.can_remove_pins,
-            created_at=collab.created_at,
-        )
+        return self._collab_to_response(collab)
 
     async def get_collaborators(self, board_id: str) -> CollaboratorListResponse:
-        # Verificar que el board existe
         await self._get_uc.execute(board_id)
-
-        # Obtener colaboradores del repo directamente
         collabs = await self._add_collab_uc._repo.get_collaborators(board_id)
-        responses = [
-            BoardCollaboratorResponse(
-                id=c.id,
-                board_id=c.board_id,
-                user_id=c.user_id,
-                user_username="",       # TODO: obtener del usuario real
-                user_full_name="",      # TODO: obtener del usuario real
-                user_avatar_url=None,   # TODO: obtener del usuario real
-                can_edit=c.can_edit,
-                can_add_pins=c.can_add_pins,
-                can_remove_pins=c.can_remove_pins,
-                created_at=c.created_at,
-            )
-            for c in collabs
-        ]
-        return CollaboratorListResponse(collaborators=responses)
+        return CollaboratorListResponse(
+            collaborators=[self._collab_to_response(c) for c in collabs]
+        )

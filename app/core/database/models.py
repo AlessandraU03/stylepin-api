@@ -26,23 +26,23 @@ class User(Base):
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     username = Column(String(30), unique=True, nullable=False)
     email = Column(String(255), unique=True, nullable=False)
-    password_hash = Column(String(255), nullable=False)  # ✅ NO hashed_password
-    full_name = Column(String(100), nullable=False)  # ✅ AGREGAR
+    password_hash = Column(String(255), nullable=False)
+    full_name = Column(String(100), nullable=False)
     bio = Column(Text, nullable=True)
-    avatar_url = Column(String(500), nullable=True)  # ✅ NO profile_picture
-    gender = Column(String(50), default="prefer_not_to_say")  # ✅ AGREGAR
-    preferred_styles = Column(Text, nullable=True)  # ✅ AGREGAR (JSON como TEXT)
-    is_verified = Column(Boolean, default=False)  # ✅ AGREGAR
+    avatar_url = Column(String(500), nullable=True)
+    gender = Column(String(50), default="prefer_not_to_say")
+    preferred_styles = Column(Text, nullable=True)
+    is_verified = Column(Boolean, default=False)
     is_active = Column(Boolean, default=True)
-    role = Column(String(20), default="user")  # ✅ AGREGAR
-    email_verified_at = Column(DateTime, nullable=True)  # ✅ AGREGAR
-    login_attempts = Column(Integer, default=0)  # ✅ AGREGAR
-    locked_until = Column(DateTime, nullable=True)  # ✅ AGREGAR
-    password_reset_token = Column(String(255), nullable=True)  # ✅ AGREGAR
-    password_reset_token_expiry = Column(DateTime, nullable=True)  # ✅ AGREGAR
+    role = Column(String(20), default="user")
+    email_verified_at = Column(DateTime, nullable=True)
+    login_attempts = Column(Integer, default=0)
+    locked_until = Column(DateTime, nullable=True)
+    password_reset_token = Column(String(255), nullable=True)
+    password_reset_token_expiry = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    last_login = Column(DateTime, nullable=True)  # ✅ AGREGAR
+    last_login = Column(DateTime, nullable=True)
     
     # Relaciones
     pins = relationship("Pin", back_populates="user", cascade="all, delete-orphan")
@@ -71,21 +71,21 @@ class Pin(Base):
     user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     title = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
-    image_url = Column(String(500), nullable=False)  # ✅ REQUIRED
+    image_url = Column(String(500), nullable=False)
     category = Column(String(100), nullable=True)
-    styles = Column(Text, nullable=True)  # ✅ AGREGAR (JSON como TEXT)
-    occasions = Column(Text, nullable=True)  # ✅ AGREGAR
+    styles = Column(Text, nullable=True)
+    occasions = Column(Text, nullable=True)
     season = Column(String(50), nullable=True)
-    brands = Column(Text, nullable=True)  # ✅ AGREGAR
+    brands = Column(Text, nullable=True)
     price_range = Column(String(50), nullable=True)
-    where_to_buy = Column(String(200), nullable=True)  # ✅ AGREGAR
-    purchase_link = Column(String(500), nullable=True)  # ✅ AGREGAR
+    where_to_buy = Column(String(200), nullable=True)
+    purchase_link = Column(String(500), nullable=True)
     likes_count = Column(Integer, default=0)
-    saves_count = Column(Integer, default=0)  # ✅ AGREGAR
+    saves_count = Column(Integer, default=0)
     comments_count = Column(Integer, default=0)
-    views_count = Column(Integer, default=0)  # ✅ AGREGAR
-    colors = Column(Text, nullable=True)  # ✅ AGREGAR
-    tags = Column(Text, nullable=True)  # ✅ AGREGAR
+    views_count = Column(Integer, default=0)
+    colors = Column(Text, nullable=True)
+    tags = Column(Text, nullable=True)
     is_private = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -100,6 +100,7 @@ class Pin(Base):
         Index('idx_is_private', 'is_private'),
         Index('idx_user_id', 'user_id'),
     )
+
 # =====================================================
 # LIKES
 # =====================================================
@@ -177,7 +178,10 @@ class Board(Base):
     user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     name = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
+    cover_image_url = Column(String(500), nullable=True)
     is_private = Column(Boolean, default=False)
+    is_collaborative = Column(Boolean, default=False)
+    pins_count = Column(Integer, default=0)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -202,6 +206,8 @@ class BoardPin(Base):
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     board_id = Column(String(36), ForeignKey("boards.id", ondelete="CASCADE"), nullable=False)
     pin_id = Column(String(36), ForeignKey("pins.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
+    notes = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # Relaciones
@@ -224,6 +230,8 @@ class BoardCollaborator(Base):
     board_id = Column(String(36), ForeignKey("boards.id", ondelete="CASCADE"), nullable=False)
     user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     can_edit = Column(Boolean, default=False)
+    can_add_pins = Column(Boolean, default=True)
+    can_remove_pins = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # Relaciones
@@ -236,7 +244,7 @@ class BoardCollaborator(Base):
     )
 
 # =====================================================
-# NOTIFICATIONS
+# NOTIFICATIONS  ← FIX: usar String en lugar de Enum(NotificationType)
 # =====================================================
 
 class Notification(Base):
@@ -245,7 +253,10 @@ class Notification(Base):
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     actor_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    type = Column(Enum(NotificationType), nullable=False)
+    # ← FIX: String(50) en vez de Enum(NotificationType)
+    # Enum(NotificationType) almacena el nombre del enum (LIKE, FOLLOW...)
+    # pero MySQL tiene el ENUM definido con valores en minúsculas (like, follow...)
+    type = Column(String(50), nullable=False)
     pin_id = Column(String(36), ForeignKey("pins.id", ondelete="SET NULL"), nullable=True)
     comment_id = Column(String(36), ForeignKey("comments.id", ondelete="SET NULL"), nullable=True)
     board_id = Column(String(36), ForeignKey("boards.id", ondelete="SET NULL"), nullable=True)

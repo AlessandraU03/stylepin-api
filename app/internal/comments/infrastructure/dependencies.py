@@ -1,5 +1,5 @@
 """
-Inyección de dependencias para Comments
+Inyección de dependencias para Comments - CORREGIDO
 """
 from fastapi import Depends
 from sqlalchemy.orm import Session
@@ -13,19 +13,24 @@ from internal.comments.application.use_cases.get_replies import GetRepliesUseCas
 from internal.comments.application.use_cases.update_comment import UpdateCommentUseCase
 from internal.comments.application.use_cases.delete_comment import DeleteCommentUseCase
 from internal.comments.application.use_cases.like_comment import LikeCommentUseCase
-
-# ← AGREGAR estos dos imports
 from internal.users.infrastructure.adapters.mysql_user_repository import MySQLUserRepository
 from internal.pines.infrastructure.adapters.mysql_pin_repository import MySQLPinRepository
+from internal.notifications.infrastructure.http.mysql_notificarion_repository import MySQLNotificationRepository
 
 
 def get_comment_controller(db: Session = Depends(get_db)) -> CommentController:
-    repo       = MySQLCommentRepository(db)
-    user_repo  = MySQLUserRepository(db)   # ← NUEVO
-    pin_repo   = MySQLPinRepository(db)    # ← NUEVO
+    repo              = MySQLCommentRepository(db)
+    user_repo         = MySQLUserRepository(db)
+    pin_repo          = MySQLPinRepository(db)
+    notification_repo = MySQLNotificationRepository(db)  # ← NUEVO
 
     return CommentController(
-        create_uc=CreateCommentUseCase(repo, user_repo, pin_repo),  # ← 3 args
+        create_uc=CreateCommentUseCase(
+            comment_repository=repo,
+            user_repository=user_repo,
+            pin_repository=pin_repo,
+            notification_repository=notification_repo,   # ← NUEVO
+        ),
         get_by_pin_uc=GetCommentsByPinUseCase(repo),
         get_replies_uc=GetRepliesUseCase(repo),
         update_uc=UpdateCommentUseCase(repo),

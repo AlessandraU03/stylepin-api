@@ -1,5 +1,6 @@
 """
-Controlador HTTP de Comments
+Controlador HTTP de Comments - CORREGIDO
+Problema original: user_username y user_full_name siempre eran ""
 """
 import logging
 
@@ -33,29 +34,53 @@ class CommentController:
         like_uc: LikeCommentUseCase,
         db_session=None,
     ):
-        self._create_uc     = create_uc
+        self._create_uc = create_uc
         self._get_by_pin_uc = get_by_pin_uc
         self._get_replies_uc = get_replies_uc
-        self._update_uc     = update_uc
-        self._delete_uc     = delete_uc
-        self._like_uc       = like_uc
-        self._db            = db_session
+        self._update_uc = update_uc
+        self._delete_uc = delete_uc
+        self._like_uc = like_uc
+        self._db = db_session
 
-    @staticmethod
+    # ── Helper: obtener datos de usuario ─────────────────────
+
+    def _get_user_data(self, user_id: str) -> dict:
+        """Obtiene datos del usuario para rellenar respuestas de comentarios."""
+        if not self._db:
+            return {"username": "", "full_name": "", "avatar_url": None, "is_verified": False}
+        try:
+            from core.database.models import User
+            user = self._db.query(User).filter(User.id == user_id).first()
+            if user:
+                return {
+                    "username": user.username or "",
+                    "full_name": user.full_name or user.username or "",
+                    "avatar_url": user.avatar_url,
+                    "is_verified": user.is_verified or False,
+                }
+        except Exception as e:
+            logger.error(f"Error obteniendo usuario {user_id}: {e}")
+        return {"username": "", "full_name": "", "avatar_url": None, "is_verified": False}
+
+    # ── Mapeo Comment → CommentResponse ──────────────────────
+
     def _to_response(
+        self,
         comment: Comment,
         current_user_id: str = None,
         replies_count: int = 0,
     ) -> CommentResponse:
         is_owner = (current_user_id == comment.user_id) if current_user_id else False
+        # CORRECCIÓN: obtener datos reales del autor del comentario
+        user_data = self._get_user_data(comment.user_id)
         return CommentResponse(
             id=comment.id,
             pin_id=comment.pin_id,
             user_id=comment.user_id,
-            user_username="",
-            user_full_name="",
-            user_avatar_url=None,
-            user_is_verified=False,
+            user_username=user_data["username"],
+            user_full_name=user_data["full_name"],
+            user_avatar_url=user_data["avatar_url"],
+            user_is_verified=user_data["is_verified"],
             text=comment.text,
             parent_comment_id=comment.parent_comment_id,
             likes_count=comment.likes_count,
@@ -67,14 +92,15 @@ class CommentController:
             replies_count=replies_count,
         )
 
+    # ── Métodos del controlador ───────────────────────────────
+
     async def create_comment(
         self, body: CreateCommentRequest, user_id: str
     ) -> CommentResponse:
-        # El use case ya maneja la notificación internamente
         comment = await self._create_uc.execute(
             pin_id=body.pin_id,
             user_id=user_id,
-            text=body.text,                          # ← campo correcto
+            text=body.text,
             parent_comment_id=body.parent_comment_id,
         )
         return self._to_response(comment, current_user_id=user_id)
